@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block title %}الخدمات{% endblock %}
+{% block topbar_title %}الخدمات{% endblock %}
+{% block topbar_sub %}كل خدمات المختبر{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('create_service') }}" class="btn btn-primary">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+    إضافة خدمة
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">إجمالي الخدمات</div>
+    <div class="stat-value si-blue">{{ pagination.total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">متوسط السعر</div>
+    <div class="stat-value si-green">
+      {% if services %}
+        {{ "%.0f"|format(services|map(attribute='price')|sum / services|length) }} ج.م
+      {% else %}
+        0 ج.م
+      {% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">أعلى سعر</div>
+    <div class="stat-value si-amber">
+      {% if services %}
+        {{ "%.0f"|format(services|map(attribute='price')|max) }} ج.م
+      {% else %}
+        0 ج.م
+      {% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">أقل سعر</div>
+    <div class="stat-value si-red">
+      {% if services %}
+        {{ "%.0f"|format(services|map(attribute='price')|min) }} ج.م
+      {% else %}
+        0 ج.م
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <form method="GET" action="{{ url_for('list_services') }}" class="toolbar-left">
+    <div class="search-box">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input
+        type="text"
+        name="search"
+        placeholder="بحث باسم الخدمة..."
+        value="{{ search or '' }}"
+        class="search-input"
+      >
+    </div>
+    <button type="submit" class="btn btn-ghost">بحث</button>
+    {% if search %}
+      <a href="{{ url_for('list_services') }}" class="btn btn-ghost">مسح</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Table -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">قائمة الخدمات</span>
+    <span class="text-muted" style="font-size:.85rem;">{{ pagination.total }} خدمة</span>
+  </div>
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>اسم الخدمة</th>
+          <th>الوصف</th>
+          <th>السعر</th>
+          <th>الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for service in services %}
+        <tr>
+          <td>{{ loop.index + (pagination.page - 1) * pagination.per_page }}</td>
+          <td><strong>{{ service.name }}</strong></td>
+          <td class="text-muted">{{ service.description or '—' }}</td>
+          <td>
+            <span style="
+              background: rgba(99,102,241,.12);
+              color: #818cf8;
+              padding: .25rem .75rem;
+              border-radius: 999px;
+              font-weight: 600;
+              font-size: .9rem;
+            ">{{ "%.2f"|format(service.price) }} ج.م</span>
+          </td>
+          <td>
+            <div style="display:flex;gap:.5rem;">
+              <a href="{{ url_for('edit_service', service_id=service.id) }}" class="btn btn-ghost btn-sm">تعديل</a>
+              <form method="POST" action="{{ url_for('delete_service', service_id=service.id) }}"
+                    onsubmit="return confirm('هل أنت متأكد من حذف هذه الخدمة؟')">
+                <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" style="text-align:center;padding:3rem;color:var(--text-muted);">
+            {% if search %}
+              لا توجد خدمات تطابق "{{ search }}"
+            {% else %}
+              لا توجد خدمات بعد — <a href="{{ url_for('create_service') }}" style="color:var(--primary);">أضف أول خدمة</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination.pages > 1 %}
+  <div class="pagination">
+    {% if pagination.has_prev %}
+      <a href="{{ url_for('list_services', page=pagination.prev_num, search=search) }}" class="btn btn-ghost btn-sm">السابق</a>
+    {% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <a href="{{ url_for('list_services', page=p, search=search) }}"
+           class="btn btn-sm {% if p == pagination.page %}btn-primary{% else %}btn-ghost{% endif %}">{{ p }}</a>
+      {% else %}
+        <span style="padding:.25rem .5rem;color:var(--text-muted);">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}
+      <a href="{{ url_for('list_services', page=pagination.next_num, search=search) }}" class="btn btn-ghost btn-sm">التالي</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

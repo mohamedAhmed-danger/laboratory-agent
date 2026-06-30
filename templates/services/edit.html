@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}تعديل خدمة{% endblock %}
+{% block topbar_title %}تعديل خدمة{% endblock %}
+{% block topbar_sub %}{{ service.name }}{% endblock %}
+
+{% block content %}
+
+<div class="card" style="max-width:640px;">
+  <div class="card-header">
+    <span class="card-title">تعديل بيانات الخدمة</span>
+    <!-- delete button top right -->
+    <form method="POST" action="{{ url_for('delete_service', service_id=service.id) }}"
+          onsubmit="return confirm('هل أنت متأكد من حذف هذه الخدمة؟')">
+      <button type="submit" class="btn btn-danger btn-sm">حذف الخدمة</button>
+    </form>
+  </div>
+
+  <form action="{{ url_for('edit_service', service_id=service.id) }}" method="POST" style="padding:1.5rem;">
+    <div class="form-grid">
+
+      <div class="form-group full-width">
+        <label>اسم الخدمة <span style="color:#f87171;">*</span></label>
+        <input
+          type="text"
+          name="name"
+          class="form-control"
+          required
+          value="{{ service.name }}"
+        >
+      </div>
+
+      <div class="form-group full-width">
+        <label>الوصف</label>
+        <textarea
+          name="description"
+          class="form-control"
+          rows="3"
+        >{{ service.description or '' }}</textarea>
+      </div>
+
+      <div class="form-group full-width">
+        <label>السعر (ج.م) <span style="color:#f87171;">*</span></label>
+        <input
+          type="number"
+          name="price"
+          class="form-control"
+          step="0.01"
+          min="0"
+          required
+          value="{{ service.price }}"
+        >
+      </div>
+
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" style="margin-bottom:1rem;">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary btn-submit">حفظ التغييرات</button>
+      <a href="{{ url_for('list_services') }}" class="btn btn-ghost">رجوع</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
