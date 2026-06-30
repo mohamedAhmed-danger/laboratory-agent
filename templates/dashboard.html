@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}
+Dashboard
+{% endblock %}
+
+{% block topbar_title %}
+لوحة التحكم
+{% endblock %}
+
+{% block topbar_sub %}
+نظرة عامة على النظام
+{% endblock %}
+
+{% block content %}
+
+<div class="dashboard">
+
+    <h2>مرحباً {{ current_user.username }}</h2>
+
+    <div class="cards">
+
+        <div class="card">
+            <h3>{{ pending_inquiries_count }}</h3>
+            <p>طلبات تحت المراجعة</p>
+        </div>
+
+        <div class="card">
+            <h3>0</h3>
+            <p>الحجوزات</p>
+        </div>
+
+        <div class="card">
+            <h3>0</h3>
+            <p>الشكاوى</p>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

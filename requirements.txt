@@ -1,0 +1,12 @@
+flask
+flask_migrate
+flask_sqlalchemy
+flask_login
+python-dotenv
+llama-index
+llama-parse
+google-generativeai
+langchain-google-genai
+arabic-reshaper
+python-bidi
+reportlab
