@@ -44,7 +44,6 @@ class Platform(db.Model):
     name = db.Column(db.String(100), nullable=False)
     pages = db.relationship('Page', backref='platform', lazy=True)
 
-
 class Inquiry(db.Model):
     __tablename__ = 'inquiry'
     id = db.Column(db.Integer, primary_key=True)
@@ -117,4 +116,4 @@ class RequestCounter(db.Model):
     def decrement(self):
         if self.count is not None and self.count > 0:
             self.count -= 1
-            db.session.commit()
+            db.session.commit()

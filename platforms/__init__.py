@@ -1,0 +1,3 @@
+"""
+Platforms package initialization
+"""

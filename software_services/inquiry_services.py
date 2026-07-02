@@ -91,8 +91,9 @@ class InquiryService:
         ocr_extracted_text: str = None,
         confidence_score: float = None,
         services_mentioned: str = None,
+        status: Status = Status.PENDING,
     ):
-        """Called by the OCR layer when confidence > 70 %."""
+        """Saves prescription inquiry to the database."""
         try:
             inquiry = Inquiry(
                 laboratory_id=laboratory_id,
@@ -102,7 +103,7 @@ class InquiryService:
                 ocr_extracted_text=ocr_extracted_text,
                 confidence_score=confidence_score,
                 services_mentioned=services_mentioned,
-                status=Status.PENDING,
+                status=status,
                 created_at=datetime.now(timezone.utc),
             )
             db.session.add(inquiry)
@@ -111,6 +112,7 @@ class InquiryService:
         except Exception as e:
             db.session.rollback()
             return InquiryResult(False, None, f"حدث خطأ: {str(e)}")
+
 
     @staticmethod
     def update_status(inquiry_id, new_status: str):

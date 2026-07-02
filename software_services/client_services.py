@@ -88,3 +88,25 @@ class ClientService:
         except Exception as e:
             db.session.rollback()
             return None, f"حدث خطأ أثناء الحذف: {str(e)}"
+
+    @staticmethod
+    def get_or_create_client(sender_id, page_id, platform_id):
+        client = Client.query.filter_by(
+            platform_id=platform_id, page_id=page_id, sender_id=sender_id
+        ).first()
+        if not client:
+            client = Client(
+                platform_id=platform_id,
+                page_id=page_id,
+                sender_id=sender_id,
+                summary="",
+                last_bot_message=""
+            )
+            db.session.add(client)
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"[ClientService] Error creating client: {e}")
+        return client
+

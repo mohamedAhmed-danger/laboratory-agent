@@ -4,7 +4,7 @@ from flask_migrate import Migrate
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 
-from models.models import db, User, Laboratory
+from models.models import db, User, Laboratory, Page
 from software_services.laboratory_services import LaboratoryService
 from software_services.service_services import ServiceService
 from software_services.booking_services import BookingService
@@ -390,7 +390,13 @@ def inquiry_detail(inquiry_id):
     if not result.success:
         flash(result.message, 'error')
         return redirect(url_for('list_inquiries'))
-    return render_template('inquiries/detail.html', inquiry=result.inquiry)
+    
+    from software_services.service_services import ServiceService
+    pagination, _ = ServiceService.get_all_services(page=1, per_page=1000)
+    services = pagination.items if pagination else []
+    
+    return render_template('inquiries/detail.html', inquiry=result.inquiry, services=services)
+
  
  
 @app.route('/inquiries/<int:inquiry_id>/status', methods=['POST'])
@@ -400,6 +406,85 @@ def update_inquiry_status(inquiry_id):
     result = InquiryService.update_status(inquiry_id, new_status)
     flash(result.message, 'success' if result.success else 'error')
     return redirect(request.referrer or url_for('list_inquiries'))
+
+
+@app.route('/inquiries/<int:inquiry_id>/confirm', methods=['POST'])
+@login_required
+def confirm_inquiry(inquiry_id):
+    result = InquiryService.get_inquiry_by_id(inquiry_id)
+    if not result.success:
+        flash(result.message, 'error')
+        return redirect(url_for('list_inquiries'))
+    inquiry = result.inquiry
+    
+    selected_service_ids = request.form.getlist('selected_services')
+    if not selected_service_ids:
+        flash('يرجى تحديد خدمة واحدة على الأقل.', 'error')
+        return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
+        
+    from models.models import Service, Page, Status
+    from platforms.facebook_handler import FacebookHandler
+    from software_services.client_services import ClientService
+    
+    selected_services = Service.query.filter(Service.id.in_([int(sid) for sid in selected_service_ids])).all()
+    if not selected_services:
+        flash('الخدمات المحددة غير صالحة.', 'error')
+        return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
+        
+    service_names = []
+    message_lines = [
+        "تمت مراجعة الروشتة الخاصة بك من قبل الطبيب. التحاليل المطلوبة هي:",
+    ]
+    total_price = 0.0
+    for s in selected_services:
+        service_names.append(s.name)
+        message_lines.append(f"- {s.name}: {s.price} ج.م")
+        total_price += s.price
+        
+    message_lines.append(f"إجمالي التكلفة: {total_price} ج.م")
+    message_lines.append("لتأكيد حجز موعد الموعد، يرجى كتابة 'تأكيد' أو 'تمام'.")
+    reply_text = "\n".join(message_lines)
+    
+    comes_from = inquiry.comes_from or ""
+    if not comes_from.startswith("Facebook:"):
+        inquiry.services_mentioned = ", ".join(service_names)
+        inquiry.status = Status.REVIEWED
+        db.session.commit()
+        flash('تمت المراجعة وحفظ البيانات محلياً (المصدر ليس Facebook).', 'success')
+        return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
+        
+    parts = comes_from.split(":")
+    sender_id = parts[1]
+    page_id = parts[2]
+    
+    page = Page.query.filter_by(page_id=page_id).first()
+    if not page:
+        flash('الصفحة المرتبطة بهذا الاستفسار غير موجودة.', 'error')
+        return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
+        
+    try:
+        handler = FacebookHandler(page)
+        handler.send(sender_id, reply_text)
+        
+        ClientService.update_client_summary_and_last_bot_message(
+            sender_id=sender_id,
+            page_id=page_id,
+            platform_id=2,
+            summary=f"Doctor reviewed prescription and confirmed tests: {', '.join(service_names)}. Total price: {total_price} EGP.",
+            last_bot_message=reply_text
+        )
+        
+        inquiry.services_mentioned = ", ".join(service_names)
+        inquiry.status = Status.REVIEWED
+        db.session.commit()
+        
+        flash('تم تأكيد الروشتة وإرسالها للمستخدم بنجاح.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء إرسال الرد: {str(e)}', 'error')
+        
+    return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
+
  
  
 @app.route('/inquiries/<int:inquiry_id>/delete', methods=['POST'])
@@ -606,6 +691,87 @@ def edit_platform(platform_id):
         flash(msg, 'error')
  
     return render_template('platforms/edit.html', platform=platform)
+
+# ── Facebook Webhook ──────────────────────────────────────────────────────────
+
+from flask import abort
+from platforms.facebook_handler import FacebookHandler
+from parsers.facebook import parse_facebook_message, parse_facebook_comment
+import threading
+
+VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN") or os.environ.get("FB_VERIFY_TOKEN")
+
+@app.route("/webhook/facebook", methods=["GET", "POST"])
+def fb_webhook():
+    if request.method == "GET":
+        if request.args.get("hub.verify_token") == VERIFY_TOKEN:
+            return request.args.get("hub.challenge", "")
+        abort(403)
+ 
+    try:
+        payload = request.json or {}
+        entries = payload.get("entry", [])
+    except Exception:
+        return "OK", 200
+ 
+    def process():
+        for entry in entries:
+            page_id = entry.get("id")
+            if not page_id:
+                continue
+ 
+            with app.app_context():
+                try:
+                    page = Page.query.filter_by(page_id=page_id).first()
+                    if not page:
+                        continue
+ 
+                    handler = FacebookHandler(page)
+ 
+                    # ── regular messages ──────────────────────────────────
+                    for messaging in entry.get("messaging", []):
+                        message = parse_facebook_message(
+                            messaging=messaging,
+                            page_id=page.page_id,
+                            platform_id=handler.platform_id,
+                            platform_name=handler.platform_name,
+                        )
+ 
+                        if not message:
+                            continue
+ 
+                        handler.send_typing(message.sender_id)
+                        reply, pdf_bytes = handler.handle(message)
+ 
+                        if reply:
+                            handler.send(message.sender_id, reply)
+ 
+                        if pdf_bytes:
+                            handler.send_file(
+                                recipient_id=message.sender_id,
+                                file_bytes=pdf_bytes,
+                                filename="booking_ticket.pdf",
+                            )
+ 
+                    # ── comments ──────────────────────────────────────────
+                    for change in entry.get("changes", []):
+                        print(f"[DEBUG CHANGE VALUE] {change.get('value', {})}")
+                        comment_id = parse_facebook_comment(change)
+
+                        if not comment_id:
+                            continue
+                        print(f"[DEBUG COMMENT] comment_id={comment_id}")
+                        handler.handle_comment(comment_id)
+ 
+                except Exception:
+                    import traceback
+                    print("WEBHOOK THREAD ERROR:")
+                    print(traceback.format_exc())
+
+    threading.Thread(target=process, daemon=True).start()
+    return "OK", 200
+
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
