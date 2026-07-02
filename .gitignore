@@ -1,1 +1,5 @@
 myenv
+.env
+instance
+*.pyc
+__pycache__/**
