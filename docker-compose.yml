@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    container_name: medical-agent-markting
+    ports:
+      - "127.0.0.1:4500:4500"
+    volumes:
+      - ./instance:/app/instance
+    env_file:
+      - .env
+    restart: always

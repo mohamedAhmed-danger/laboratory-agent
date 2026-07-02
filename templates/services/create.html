@@ -1,20 +1,20 @@
 {% extends 'base.html' %}
-{% block title %}إضافة خدمة{% endblock %}
-{% block topbar_title %}إضافة خدمة{% endblock %}
-{% block topbar_sub %}إنشاء خدمة جديدة للمختبر{% endblock %}
+{% block title %}إضافة تحليل{% endblock %}
+{% block topbar_title %}إضافة تحليل{% endblock %}
+{% block topbar_sub %}إنشاء تحليل جديد للمعمل{% endblock %}
 
 {% block content %}
 
 <div class="card" style="max-width:640px;">
   <div class="card-header">
-    <span class="card-title">بيانات الخدمة</span>
+    <span class="card-title">بيانات التحليل</span>
   </div>
 
   <form action="{{ url_for('create_service') }}" method="POST" style="padding:1.5rem;">
     <div class="form-grid">
 
       <div class="form-group full-width">
-        <label>اسم الخدمة <span style="color:#f87171;">*</span></label>
+        <label>اسم التحليل <span style="color:#f87171;">*</span></label>
         <input
           type="text"
           name="name"
@@ -58,7 +58,7 @@
     {% endwith %}
 
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary btn-submit">حفظ الخدمة</button>
+      <button type="submit" class="btn btn-primary btn-submit">حفظ التحليل</button>
       <a href="{{ url_for('list_services') }}" class="btn btn-ghost">رجوع</a>
     </div>
   </form>

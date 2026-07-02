@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
-{% block title %}تعديل خدمة{% endblock %}
-{% block topbar_title %}تعديل خدمة{% endblock %}
+{% block title %}تعديل تحليل{% endblock %}
+{% block topbar_title %}تعديل تحليل{% endblock %}
 {% block topbar_sub %}{{ service.name }}{% endblock %}
 
 {% block content %}
 
 <div class="card" style="max-width:640px;">
   <div class="card-header">
-    <span class="card-title">تعديل بيانات الخدمة</span>
+    <span class="card-title">تعديل بيانات التحليل</span>
     <!-- delete button top right -->
     <form method="POST" action="{{ url_for('delete_service', service_id=service.id) }}"
-          onsubmit="return confirm('هل أنت متأكد من حذف هذه الخدمة؟')">
-      <button type="submit" class="btn btn-danger btn-sm">حذف الخدمة</button>
+          onsubmit="return confirm('هل أنت متأكد من حذف هذا التحليل؟')">
+      <button type="submit" class="btn btn-danger btn-sm">حذف التحليل</button>
     </form>
   </div>
 
@@ -19,7 +19,7 @@
     <div class="form-grid">
 
       <div class="form-group full-width">
-        <label>اسم الخدمة <span style="color:#f87171;">*</span></label>
+        <label>اسم التحليل <span style="color:#f87171;">*</span></label>
         <input
           type="text"
           name="name"

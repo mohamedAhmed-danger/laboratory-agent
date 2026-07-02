@@ -45,14 +45,14 @@
 <!-- Edit Form -->
 <div class="card">
   <div class="card-header">
-    <span class="card-title">تعديل بيانات المختبر</span>
+    <span class="card-title">تعديل بيانات المعمل</span>
   </div>
 
   <form action="{{ url_for('laboratory_update') }}" method="POST">
     <div class="form-grid">
 
       <div class="form-group full-width">
-        <label>اسم المختبر</label>
+        <label>اسم المعمل</label>
         <input
           type="text"
           name="name"
@@ -98,12 +98,12 @@
     <path stroke-linecap="round" stroke-linejoin="round"
       d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
   </svg>
-  <p style="color:var(--text-muted); margin-bottom: 24px;">لم يتم إنشاء بيانات المختبر بعد.</p>
+  <p style="color:var(--text-muted); margin-bottom: 24px;">لم يتم إنشاء بيانات المعمل بعد.</p>
 
   <form action="{{ url_for('laboratory_update') }}" method="POST">
     <div class="form-grid" style="max-width:500px; margin: 0 auto;">
       <div class="form-group full-width">
-        <label>اسم المختبر</label>
+        <label>اسم المعمل</label>
         <input type="text" name="name" class="form-control" required>
       </div>
       <div class="form-group full-width">

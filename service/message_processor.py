@@ -141,7 +141,7 @@ def handle_image_message(message: IncomingMessage, page) -> tuple[str, bytes | N
             else:
                 # Low confidence prescription or spam
                 if ocr_result.get("classified_as") == "prescription":
-                    static_reply = "لقد استلمنا صورتك وسيقوم الطبيب/الصيدلي بمراجعتها والرد عليك فوراً."
+                    static_reply = "لقد استلمنا صورتك وسيقوم الطبيب بمراجعتها والرد عليك ."
                     
                     # Update Client summary in DB
                     ClientService.update_client_summary_and_last_bot_message(

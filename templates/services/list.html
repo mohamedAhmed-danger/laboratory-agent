@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}الخدمات{% endblock %}
-{% block topbar_title %}الخدمات{% endblock %}
-{% block topbar_sub %}كل خدمات المختبر{% endblock %}
+{% block title %}التحاليل{% endblock %}
+{% block topbar_title %}التحاليل{% endblock %}
+{% block topbar_sub %}كل تحليلات المعمل{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('create_service') }}" class="btn btn-primary">
     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
       <path d="M12 5v14M5 12h14"/>
     </svg>
-    إضافة خدمة
+    إضافة تحليل
   </a>
 {% endblock %}
 
@@ -17,7 +17,7 @@
 <!-- Stats -->
 <div class="stats-grid">
   <div class="stat-card">
-    <div class="stat-label">إجمالي الخدمات</div>
+    <div class="stat-label">إجمالي التحليلات</div>
     <div class="stat-value si-blue">{{ pagination.total }}</div>
   </div>
   <div class="stat-card">
@@ -62,7 +62,7 @@
       <input
         type="text"
         name="search"
-        placeholder="بحث باسم الخدمة..."
+        placeholder="بحث باسم التحليل..."
         value="{{ search or '' }}"
         class="search-input"
       >
@@ -77,15 +77,15 @@
 <!-- Table -->
 <div class="card">
   <div class="card-header">
-    <span class="card-title">قائمة الخدمات</span>
-    <span class="text-muted" style="font-size:.85rem;">{{ pagination.total }} خدمة</span>
+    <span class="card-title">قائمة التحليلات</span>
+    <span class="text-muted" style="font-size:.85rem;">{{ pagination.total }} تحليل</span>
   </div>
   <div class="table-wrapper">
     <table class="table">
       <thead>
         <tr>
           <th>#</th>
-          <th>اسم الخدمة</th>
+          <th>اسم التحليل</th>
           <th>الوصف</th>
           <th>السعر</th>
           <th>الإجراءات</th>
@@ -121,9 +121,9 @@
         <tr>
           <td colspan="5" style="text-align:center;padding:3rem;color:var(--text-muted);">
             {% if search %}
-              لا توجد خدمات تطابق "{{ search }}"
+              لا توجد تحليلات تطابق "{{ search }}"
             {% else %}
-              لا توجد خدمات بعد — <a href="{{ url_for('create_service') }}" style="color:var(--primary);">أضف أول خدمة</a>
+              لا توجد تحليلات بعد — <a href="{{ url_for('create_service') }}" style="color:var(--primary);">أضف أول تحليل</a>
             {% endif %}
           </td>
         </tr>

@@ -67,7 +67,16 @@ Use this to resolve relative dates like "بكرا", "السبت الجاي", etc
 LABORATORY & SERVICES DATA
 ====================
 Laboratory Info: {lab_info}
-Available Services: {services}
+Available Services: {services} 
+
+The available services contain all laboratory analyses with:
+- Analysis Name
+- Required Specimen (sample type)
+- Result Duration (expected turnaround time in days; 0 = same day)
+- Original Price
+
+Use this data to answer questions about analysis availability, prices, required specimens, and result duration. Never invent analyses or prices.
+
 
 ====================
 ALREADY COLLECTED
