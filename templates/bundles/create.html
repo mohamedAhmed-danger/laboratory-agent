@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}باقة جديدة{% endblock %}
+{% block topbar_title %}باقة جديدة{% endblock %}
+{% block topbar_sub %}إضافة باقة تحاليل جديدة{% endblock %}
+
+{% block content %}
+
+<div class="card" style="max-width:640px;">
+  <div class="card-header">
+    <span class="card-title">بيانات الباقة</span>
+  </div>
+
+  <form action="{{ url_for('create_bundle') }}" method="POST" style="padding:1.5rem;">
+    <div class="form-grid">
+
+      <div class="form-group full-width">
+        <label>اسم الباقة <span style="color:#f87171;">*</span></label>
+        <input
+          type="text"
+          name="name"
+          class="form-control"
+          placeholder="مثال: باقة الفحص الشامل"
+          required
+          value="{{ request.form.get('name', '') }}"
+        >
+      </div>
+
+      <div class="form-group full-width">
+        <label>السعر <span style="color:#f87171;">*</span> <small style="opacity:.7;font-size:.8rem;">(يحسب تلقائياً من التحاليل)</small></label>
+        <input
+          type="number"
+          step="0.01"
+          name="price"
+          id="bundle-price"
+          class="form-control"
+          placeholder="0.00"
+          required
+          value="{{ request.form.get('price', '0.00') }}"
+        >
+      </div>
+
+      <div class="form-group full-width">
+        <label>تعليمات للمريض</label>
+        <textarea
+          name="patient_instructions"
+          class="form-control"
+          rows="3"
+          placeholder="مثال: صيام 12 ساعة قبل سحب العينة..."
+        >{{ request.form.get('patient_instructions', '') }}</textarea>
+      </div>
+
+      <div class="form-group full-width">
+        <label style="margin-bottom:.5rem;display:block;">اختر التحاليل المشمولة بالباقة</label>
+        <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border,#2a2a2a);padding:.75rem;border-radius:.375rem;display:flex;flex-direction:column;gap:.5rem;">
+          {% for lab in labs %}
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:normal;">
+            <input 
+              type="checkbox" 
+              name="lab_ids" 
+              value="{{ lab.id }}"
+              data-price="{{ lab.price }}" 
+              class="lab-checkbox"
+              {% if lab.id|string in request.form.getlist('lab_ids') %}checked{% endif %}
+            >
+            <span>{{ lab.name }}</span>
+            <small style="opacity:.6;margin-right:auto;">({{ "%.2f"|format(lab.price) }} ج.م)</small>
+          </label>
+          {% else %}
+          <div style="opacity:.6;font-size:.85rem;">لا توجد تحاليل متاحة للإضافة.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" style="margin-bottom:1rem;">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="form-actions" style="margin-top:1.5rem;">
+      <button type="submit" class="btn btn-primary btn-submit">حفظ الباقة</button>
+      <a href="{{ url_for('list_bundles') }}" class="btn btn-ghost">رجوع</a>
+    </div>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const priceInput = document.getElementById('bundle-price');
+  const checkboxes = document.querySelectorAll('.lab-checkbox');
+
+  function calculateTotal() {
+    let total = 0;
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        total += parseFloat(cb.getAttribute('data-price')) || 0;
+      }
+    });
+    priceInput.value = total.toFixed(2);
+  }
+
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', calculateTotal);
+  });
+});
+</script>
+
+{% endblock %}

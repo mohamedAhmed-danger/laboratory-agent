@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}تعديل تحليل{% endblock %}
+{% block topbar_title %}تعديل تحليل{% endblock %}
+{% block topbar_sub %}{{ lab.name }}{% endblock %}
+
+{% block content %}
+
+<div class="card" style="max-width:640px;">
+  <div class="card-header">
+    <span class="card-title">بيانات التحليل</span>
+  </div>
+
+  <form action="{{ url_for('edit_lab', lab_id=lab.id) }}" method="POST" style="padding:1.5rem;">
+    <div class="form-grid">
+
+      <div class="form-group full-width">
+        <label>اسم التحليل <span style="color:#f87171;">*</span></label>
+        <input type="text" name="name" class="form-control" required
+               value="{{ request.form.get('name', lab.name) }}">
+      </div>
+
+      <div class="form-group full-width">
+        <label>السعر <span style="color:#f87171;">*</span></label>
+        <input type="number" step="0.01" name="price" class="form-control" required
+               value="{{ request.form.get('price', lab.price) }}">
+      </div>
+
+      <div class="form-group full-width">
+        <label>العينة المطلوبة</label>
+        <input type="text" name="specimen" class="form-control"
+               value="{{ request.form.get('specimen', lab.specimen or '') }}">
+      </div>
+
+      <div class="form-group full-width">
+        <label>مدة الظهور</label>
+        <input type="text" name="durations" class="form-control"
+               value="{{ request.form.get('durations', lab.durations or '') }}">
+      </div>
+
+      <div class="form-group full-width">
+        <label>تعليمات للمريض</label>
+        <textarea name="patient_instructions" class="form-control" rows="3"
+        >{{ request.form.get('patient_instructions', lab.patient_instructions or '') }}</textarea>
+      </div>
+
+      <div class="form-group full-width">
+        <label>الوصف <small style="opacity:.6;">(يُنشأ تلقائياً بواسطة الذكاء الاصطناعي)</small></label>
+        <textarea class="form-control" rows="3" disabled
+                  style="opacity:.6;cursor:not-allowed;">{{ lab.description or 'لم يتم إنشاء وصف بعد' }}</textarea>
+      </div>
+
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" style="margin-bottom:1rem;">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary btn-submit">حفظ التعديلات</button>
+      <a href="{{ url_for('list_labs') }}" class="btn btn-ghost">رجوع</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

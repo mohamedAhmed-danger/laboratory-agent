@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}الباقات{% endblock %}
+{% block topbar_title %}الباقات{% endblock %}
+{% block topbar_sub %}إدارة باقات التحاليل المعملية{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('create_bundle') }}" class="btn btn-primary">
+    <i data-lucide="plus" style="width:16px;height:16px;"></i>
+    باقة جديدة
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <div class="card-header">
+    <form method="GET" style="display:flex;gap:.5rem;width:100%;">
+      <input type="text" name="search" class="form-control" placeholder="بحث باسم الباقة..."
+             value="{{ search or '' }}">
+      <button type="submit" class="btn btn-ghost">بحث</button>
+    </form>
+  </div>
+
+  <div style="display:flex;flex-direction:column;">
+
+    <div style="display:flex;align-items:center;padding:.75rem 1rem;font-weight:600;opacity:.6;font-size:.9rem;border-bottom:1px solid var(--border,#2a2a2a);">
+      <span style="flex:2;">اسم الباقة</span>
+      <span style="flex:1;">السعر</span>
+      <span style="flex:2.5;">التحاليل المشمولة</span>
+      <span style="flex:1;text-align:left;">إجراءات</span>
+    </div>
+
+    {% for bundle in bundles %}
+    <div style="display:flex;align-items:center;padding:.85rem 1rem;border-bottom:1px solid var(--border,#2a2a2a);">
+      <span style="flex:2;font-weight:500;">{{ bundle.name }}</span>
+      <span style="flex:1;font-weight:600;color:var(--primary,#10b981);">{{ "%.2f"|format(bundle.price) }} ج.م</span>
+      
+      <span style="flex:2.5;opacity:.9;font-size:.85rem;display:flex;flex-wrap:wrap;gap:.25rem;">
+        {% if bundle.services %}
+          {% for item in bundle.services %}
+            <span style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:4px;font-size:.8rem;">
+              {{ item.service.name if item.service is defined else item.name }}
+            </span>
+          {% endfor %}
+        {% else %}
+          <span style="opacity:.5;">لا توجد تحاليل</span>
+        {% endif %}
+      </span>
+
+      <span style="flex:1;display:flex;gap:.5rem;justify-content:flex-start;">
+        <a href="{{ url_for('edit_bundle', bundle_id=bundle.id) }}" class="btn btn-ghost btn-sm">تعديل</a>
+        <form action="{{ url_for('delete_bundle', bundle_id=bundle.id) }}" method="POST"
+              onsubmit="event.preventDefault(); confirmDelete(this);">
+          <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+        </form>
+      </span>
+    </div>
+    {% else %}
+    <div style="padding:2rem;text-align:center;opacity:.6;">لا توجد باقات بعد</div>
+    {% endfor %}
+
+  </div>
+
+  {% if pagination and pagination.pages > 1 %}
+  <div class="pagination">
+    {% if pagination.has_prev %}
+      <a href="{{ url_for('list_bundles', page=pagination.prev_num, search=search) }}">السابق</a>
+    {% endif %}
+    <span>{{ pagination.page }} / {{ pagination.pages }}</span>
+    {% if pagination.has_next %}
+      <a href="{{ url_for('list_bundles', page=pagination.next_num, search=search) }}">التالي</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

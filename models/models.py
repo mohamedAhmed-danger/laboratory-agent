@@ -26,16 +26,108 @@ class Laboratory(db.Model):
     info = db.Column(db.String(200), nullable=False)
 
     # ظبطنا الـ relationships عشان تقرأ من الكلاسات الصح
-    services = db.relationship('Service', backref='laboratory')
+    services = db.relationship('LabService', backref='laboratory')
+    bundles = db.relationship("Bundle", backref="laboratory", lazy=True)
+
     inquiries = db.relationship('Inquiry', backref='laboratory')
 
-class Service(db.Model):
-    __tablename__ = 'services'
+class LabService(db.Model):
+    __tablename__ = 'labservices'
     id = db.Column(db.Integer, primary_key=True)
     laboratory_id = db.Column(db.Integer, db.ForeignKey('laboratory.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(200))
     price = db.Column(db.Float, nullable=False)
+    patient_instructions= db.Column(db.String(200))
+    durations = db.Column(db.String(100))
+    keywords = db.Column(db.String(200))
+    alias_names= db.Column(db.String(100))
+    specimen = db.Column(db.String(100))
+    search_text = db.Column(db.Text)
+    is_active = db.Column(
+    db.Boolean,
+    default=True
+)
+created_at = db.Column(
+    db.DateTime,
+    default=lambda: datetime.now(timezone.utc)
+)
+
+updated_at = db.Column(
+    db.DateTime,
+    default=lambda: datetime.now(timezone.utc),
+    onupdate=lambda: datetime.now(timezone.utc)
+)
+
+
+    
+class Bundle(db.Model):
+    __tablename__ = "bundles"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    laboratory_id = db.Column(
+        db.Integer,
+        db.ForeignKey("laboratory.id"),
+        nullable=False
+    )
+
+    name = db.Column(db.String(200), nullable=False)
+
+    description = db.Column(db.Text)
+
+    patient_instructions = db.Column(db.Text)
+
+    keywords = db.Column(db.Text)
+
+    alias_names = db.Column(db.Text)
+
+    price = db.Column(db.Float)
+
+    search_text = db.Column(db.Text)
+
+    is_active = db.Column(db.Boolean, default=True)
+
+    services = db.relationship(
+        "BundleService",
+        backref="bundle",
+        cascade="all, delete-orphan"
+    )
+    created_at = db.Column(
+    db.DateTime,
+    default=lambda: datetime.now(timezone.utc)
+)
+
+updated_at = db.Column(
+    db.DateTime,
+    default=lambda: datetime.now(timezone.utc),
+    onupdate=lambda: datetime.now(timezone.utc)
+)
+
+class BundleService(db.Model):
+    __tablename__ = "bundle_services"
+
+    bundle_id = db.Column(
+        db.Integer,
+        db.ForeignKey("bundles.id"),
+        primary_key=True
+    )
+
+    service_id = db.Column(
+        db.Integer,
+        db.ForeignKey("labservices.id"),
+        primary_key=True
+    )
+
+    service = db.relationship(
+        "LabService",
+        backref="bundle_links"
+    )    
+
+
+    
+
+
 
 
 class Platform(db.Model):

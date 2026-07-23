@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}مراجعة المعرفة{% endblock %}
+{% block topbar_title %}مراجعة المعرفة الذكية{% endblock %}
+{% block topbar_sub %}{{ lab.name }}{% endblock %}
+
+{% block content %}
+
+<div class="card" style="max-width:720px;">
+  <div class="card-header">
+    <span class="card-title">البيانات المولّدة بالذكاء الاصطناعي</span>
+  </div>
+
+  <!-- NOTE: no backend wired yet — Regenerate / Approve buttons are UI-only
+       placeholders per Phase 1. The actual generate/approve endpoints exist
+       (POST /labs/<id>/generate-knowledge, /approve-knowledge) but return a
+       "not implemented yet" stub. -->
+  <form style="padding:1.5rem;">
+    <div class="form-grid">
+
+      <div class="form-group full-width">
+        <label>الوصف</label>
+        <textarea name="description" class="form-control" rows="4"
+                  placeholder="سيتم إنشاء الوصف تلقائياً هنا">{{ lab.description or '' }}</textarea>
+      </div>
+
+      <div class="form-group full-width">
+        <label>الأسماء البديلة (Aliases)</label>
+        <textarea name="alias_names" class="form-control" rows="2"
+                  placeholder="أسماء بديلة يفصل بينها فاصلة">{{ lab.alias_names or '' }}</textarea>
+      </div>
+
+      <div class="form-group full-width">
+        <label>الكلمات المفتاحية (Keywords)</label>
+        <textarea name="keywords" class="form-control" rows="2"
+                  placeholder="كلمات مفتاحية يفصل بينها فاصلة">{{ lab.keywords or '' }}</textarea>
+      </div>
+
+      <div class="form-group full-width">
+        <label>نص البحث (Search Text)</label>
+        <textarea name="search_text" class="form-control" rows="4"
+                  placeholder="النص الكامل المستخدم للبحث الدلالي لاحقاً">{{ lab.search_text or '' }}</textarea>
+      </div>
+
+    </div>
+
+   <div class="form-actions">
+  <button type="button" id="regenerateBtn" class="btn btn-ghost"
+          data-url="{{ url_for('generate_lab_knowledge', lab_id=lab.id) }}">
+    <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
+    إعادة التوليد
+  </button>
+  <button type="button" id="approveBtn" class="btn btn-primary"
+          data-url="{{ url_for('approve_lab_knowledge', lab_id=lab.id) }}">
+    <i data-lucide="check" style="width:16px;height:16px;"></i>
+    اعتماد وحفظ
+  </button>
+</div>
+</form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function callKnowledgeEndpoint(button) {
+    fetch(button.dataset.url, { method: 'POST' })
+      .then(r => r.json())
+      .then(d => alert(d.message))
+      .catch(() => alert('حدث خطأ أثناء الاتصال بالخادم'));
+  }
+
+  document.getElementById('regenerateBtn').addEventListener('click', function () {
+    callKnowledgeEndpoint(this);
+  });
+  document.getElementById('approveBtn').addEventListener('click', function () {
+    callKnowledgeEndpoint(this);
+  });
+</script>
+{% endblock %}

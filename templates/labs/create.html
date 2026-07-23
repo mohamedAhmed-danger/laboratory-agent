@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}تحليل جديد{% endblock %}
+{% block topbar_title %}تحليل جديد{% endblock %}
+{% block topbar_sub %}إضافة تحليل معملي{% endblock %}
+
+{% block content %}
+
+<div class="card" style="max-width:640px;">
+  <div class="card-header">
+    <span class="card-title">بيانات التحليل</span>
+  </div>
+
+  <form action="{{ url_for('create_lab') }}" method="POST" style="padding:1.5rem;">
+    <div class="form-grid">
+
+      <div class="form-group full-width">
+        <label>اسم التحليل <span style="color:#f87171;">*</span></label>
+        <input
+          type="text"
+          name="name"
+          class="form-control"
+          placeholder="مثال: صورة دم كاملة"
+          required
+          value="{{ request.form.get('name', '') }}"
+        >
+      </div>
+
+      <div class="form-group full-width">
+        <label>السعر <span style="color:#f87171;">*</span></label>
+        <input
+          type="number"
+          step="0.01"
+          name="price"
+          class="form-control"
+          placeholder="0.00"
+          required
+          value="{{ request.form.get('price', '') }}"
+        >
+      </div>
+
+      <div class="form-group full-width">
+        <label>العينة المطلوبة</label>
+        <input
+          type="text"
+          name="specimen"
+          class="form-control"
+          placeholder="مثال: دم وريدي"
+          value="{{ request.form.get('specimen', '') }}"
+        >
+      </div>
+
+      <div class="form-group full-width">
+        <label>مدة الظهور</label>
+        <input
+          type="text"
+          name="durations"
+          class="form-control"
+          placeholder="مثال: 24 ساعة"
+          value="{{ request.form.get('durations', '') }}"
+        >
+      </div>
+
+      <div class="form-group full-width">
+        <label>تعليمات للمريض</label>
+        <textarea
+          name="patient_instructions"
+          class="form-control"
+          rows="3"
+          placeholder="مثال: صيام 8 ساعات قبل التحليل"
+        >{{ request.form.get('patient_instructions', '') }}</textarea>
+      </div>
+
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" style="margin-bottom:1rem;">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary btn-submit">حفظ التحليل</button>
+      <a href="{{ url_for('list_labs') }}" class="btn btn-ghost">رجوع</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
