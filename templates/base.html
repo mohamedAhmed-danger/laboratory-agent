@@ -65,17 +65,7 @@
 
     <p class="nav-section-label">الإعدادات</p>
 
-    <a href="{{ url_for('list_platforms') }}"
-       class="nav-item {% if request.endpoint in ['list_platforms','create_platform','edit_platform'] %}active{% endif %}">
-      <i data-lucide="monitor-smartphone" class="nav-icon"></i>
-      المنصات
-    </a>
-
-    <a href="{{ url_for('list_pages') }}"
-       class="nav-item {% if request.endpoint in ['list_pages','create_page','edit_page'] %}active{% endif %}">
-      <i data-lucide="layout" class="nav-icon"></i>
-      الصفحات
-    </a>
+   
 
     <a href="{{ url_for('laboratory_settings') }}"
        class="nav-item {% if request.endpoint == 'laboratory_settings' %}active{% endif %}">

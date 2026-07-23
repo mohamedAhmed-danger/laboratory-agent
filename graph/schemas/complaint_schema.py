@@ -7,7 +7,7 @@ class ComplaintLead(BaseModel):
 
 class ComplaintResponse(BaseModel):
     reply: str = Field(description="Clean reply to send to the user")
-    summary: str = Field(description="An updated English summary of the user's overall state.")
+    summary: str = Field(description="An updated English summary of the conversation, including the user's complaint and the reply. This summary is for internal use only.")
     lead: ComplaintLead = Field(description="Structured complaint data ONLY.")
     confirmed: bool = Field(description="True if the user confirms sending the complaint.")
     ready_to_save: bool = Field(description="True only if both phone and complaint_text are present.")

@@ -1,100 +1,167 @@
 """
 ocr/processor.py
+
+Orchestrates the OCR pipeline using a SINGLE Gemini multimodal call.
+
+Old flow  (2 API calls):
+    classify_prescription()  →  extract_prescription_data()
+
+New flow  (1 API call):
+    analyze_prescription()  →  route based on process_success flag
+
+Routing:
+    process_success = True  (overall_confidence >= 70)
+        → save Inquiry as REVIEWED
+        → return success=True  → LangGraph agent replies automatically
+
+    process_success = False (overall_confidence < 70)  AND  is_prescription = True
+        → save Inquiry as PENDING for manual doctor review
+        → return success=False → static "waiting for doctor" reply
+
+    is_spam = True
+        → do NOT save Inquiry
+        → return success=False, classified_as="spam"
 """
 
 import os
-from ocr.classifier import classify_prescription
-from ocr.extractor import extract_prescription_data
+import logging
+from ocr.classifier import analyze_prescription
 from software_services.inquiry_services import InquiryService
 
-def process_prescription_ocr(image_path: str, phone_number: str, comes_from: str, laboratory_id: int = 1) -> dict:
+logger = logging.getLogger(__name__)
+
+CONFIDENCE_THRESHOLD = 70          # must match ocr/classifier.py
+
+
+def process_prescription_ocr(
+    image_path: str,
+    phone_number: str,
+    comes_from: str,
+    laboratory_id: int = 1,
+) -> dict:
     """
-    Orchestrates the classification, extraction, and database persistence:
-    
-    1. Classifies the document.
-    2. If the document is classified as a prescription:
-       - Extracts full text, detects mentioned laboratory services, and calculates extraction confidence score.
-       - If extraction confidence >= 70%:
-         - Saves the inquiry into the database with PENDING status.
-         - Returns a success status (success=True) to route to the LangGraph Agent.
-       - If extraction confidence < 70%:
-         - Saves the inquiry into the database with PENDING status for manual doctor review.
-         - Returns success=False to route to the static reply.
-    3. If classified as spam, rejects the document.
-    
+    Main entry-point called by service/message_processor.py.
+
+    Args:
+        image_path:     Absolute path to the downloaded prescription image.
+        phone_number:   Sender's phone number (may be empty for FB users).
+        comes_from:     Origin string, e.g. "Facebook:<sender_id>:<page_id>".
+        laboratory_id:  ID of the laboratory record (default: 1).
+
     Returns:
-        dict: Process result dictionary.
+        dict with keys:
+            success         bool
+            classified_as   "prescription" | "spam"
+            confidence      int   (0-100)
+            extracted_text  str
+            services_mentioned list[str]
+            inquiry_id      int | None
+            message         str
     """
-    # 1. Classify image
-    classification_result = classify_prescription(image_path)
-    is_prescription = classification_result.get("classification") == "prescription"
-    reason = classification_result.get("reason", "")
-    
-    if is_prescription:
-        # 2. Extract prescription data (this returns extraction text, matches, and extraction confidence!)
-        extraction_result = extract_prescription_data(image_path)
-        extracted_text = extraction_result.get("extracted_text", "")
-        services_mentioned = extraction_result.get("services_mentioned", [])
-        extraction_confidence = extraction_result.get("confidence_score", 0.0)
-        
-        # Format services as comma-separated string for DB storage
-        services_str = ", ".join(services_mentioned) if services_mentioned else None
-        filename = os.path.basename(image_path)
-        
-        if extraction_confidence >= 0.70:
-            from models.models import Status
-            # 3. Save Inquiry to the database (High Confidence) - status=REVIEWED as it is handled automatically
-            db_result = InquiryService.save_inquiry(
-                laboratory_id=laboratory_id,
-                phone_number=phone_number,
-                comes_from=comes_from,
-                prescription_img=filename,
-                ocr_extracted_text=extracted_text,
-                confidence_score=extraction_confidence,
-                services_mentioned=services_str,
-                status=Status.REVIEWED
-            )
-            
-            return {
-                "success": True,
-                "classified_as": "prescription",
-                "confidence": extraction_confidence, # Represents extraction confidence
-                "reason": reason,
-                "extracted_text": extracted_text,
-                "services_mentioned": services_mentioned,
-                "inquiry_id": db_result.inquiry.id if db_result.success and db_result.inquiry else None,
-                "message": "Prescription parsed successfully with high extraction confidence."
-            }
-        else:
-            # 3. Save Inquiry to the database (Low Confidence - Waiting for manual review)
-            db_result = InquiryService.save_inquiry(
-                laboratory_id=laboratory_id,
-                phone_number=phone_number,
-                comes_from=comes_from,
-                prescription_img=filename,
-                ocr_extracted_text="[Low Confidence Extraction - Waiting for Manual Review]",
-                confidence_score=extraction_confidence, # Represents extraction confidence
-                services_mentioned=None
-            )
-            
-            return {
-                "success": False,
-                "classified_as": "prescription",
-                "confidence": extraction_confidence, # Represents extraction confidence
-                "reason": reason,
-                "extracted_text": "",
-                "services_mentioned": [],
-                "inquiry_id": db_result.inquiry.id if db_result.success and db_result.inquiry else None,
-                "message": f"Prescription saved for manual review due to low extraction confidence ({int(extraction_confidence*100)}%)."
-            }
-    else:
+    # ── Single Gemini call ────────────────────────────────────────────────────
+    ocr = analyze_prescription(image_path)
+
+    is_prescription    = ocr.get("is_prescription", False)
+    is_spam            = ocr.get("is_spam", True)
+    overall_confidence = ocr.get("overall_confidence", 0)
+    process_success    = ocr.get("process_success", False)
+    labs               = ocr.get("labs", [])
+    unknown_items      = ocr.get("unknown_items", [])
+    notes              = ocr.get("notes", "")
+
+    logger.info(
+        "[OCR Processor] is_prescription=%s | confidence=%s | process_success=%s",
+        is_prescription, overall_confidence, process_success,
+    )
+
+    # ── Spam / non-prescription ───────────────────────────────────────────────
+    if not is_prescription:
         return {
-            "success": False,
-            "classified_as": "spam",
-            "confidence": 0.0,
-            "reason": reason,
-            "extracted_text": "",
+            "success":            False,
+            "classified_as":      "spam",
+            "confidence":         overall_confidence,
+            "extracted_text":     "",
             "services_mentioned": [],
-            "inquiry_id": None,
-            "message": f"Document rejected. Classified as spam."
+            "inquiry_id":         None,
+            "message":            f"Document rejected — not a prescription. {notes}",
         }
+
+    # ── Build extracted text from labs ───────────────────────────────────────
+    lab_lines = []
+    for lab in labs:
+        line = lab.get("standardized_name") or lab.get("matched_text", "")
+        if line:
+            lab_lines.append(line)
+
+    if unknown_items:
+        lab_lines.append("Unreadable items: " + ", ".join(unknown_items))
+
+    extracted_text  = "\n".join(lab_lines)
+    services_str    = ", ".join(
+        lab.get("standardized_name") or lab.get("matched_text", "")
+        for lab in labs
+        if lab.get("standardized_name") or lab.get("matched_text")
+    ) or None
+    filename = os.path.basename(image_path)
+
+    # ── High confidence → automated flow ─────────────────────────────────────
+    if process_success:
+        from models.models import Status
+        db_result = InquiryService.save_inquiry(
+            laboratory_id=laboratory_id,
+            phone_number=phone_number,
+            comes_from=comes_from,
+            prescription_img=filename,
+            ocr_extracted_text=extracted_text,
+            confidence_score=overall_confidence / 100.0,
+            services_mentioned=services_str,
+            status=Status.REVIEWED,
+        )
+        return {
+            "success":            True,
+            "classified_as":      "prescription",
+            "confidence":         overall_confidence,
+            "extracted_text":     extracted_text,
+            "services_mentioned": [
+                lab.get("standardized_name") or lab.get("matched_text", "")
+                for lab in labs
+            ],
+            "inquiry_id": (
+                db_result.inquiry.id
+                if db_result.success and db_result.inquiry
+                else None
+            ),
+            "message": (
+                f"Prescription parsed successfully "
+                f"(confidence={overall_confidence}%)."
+            ),
+        }
+
+    # ── Low confidence → manual doctor review ────────────────────────────────
+    db_result = InquiryService.save_inquiry(
+        laboratory_id=laboratory_id,
+        phone_number=phone_number,
+        comes_from=comes_from,
+        prescription_img=filename,
+        ocr_extracted_text=(
+            "[Low Confidence — Waiting for Manual Review]\n" + extracted_text
+        ),
+        confidence_score=overall_confidence / 100.0,
+        services_mentioned=None,
+    )
+    return {
+        "success":            False,
+        "classified_as":      "prescription",
+        "confidence":         overall_confidence,
+        "extracted_text":     "",
+        "services_mentioned": [],
+        "inquiry_id": (
+            db_result.inquiry.id
+            if db_result.success and db_result.inquiry
+            else None
+        ),
+        "message": (
+            f"Prescription saved for manual review "
+            f"(confidence={overall_confidence}% < threshold {CONFIDENCE_THRESHOLD}%)."
+        ),
+    }

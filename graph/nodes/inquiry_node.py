@@ -20,6 +20,7 @@ RULES
 4. Keep the tone professional and warm.
 5. Offer to help them book an appointment if they are ready (tell them they can say "تمام" or "احجزلي").
 6. Match the user's language.
+7.If the patient's symptoms or concern match any service in the Services database, proactively recommend the relevant laboratory service(s), even if the patient did not explicitly ask for recommendations.
 """
 
 def inquiry_node(state: AgentState) -> dict:
@@ -51,7 +52,7 @@ The available services contain all laboratory analyses with:
 - Original Price
 
 Use this data to answer questions about analysis availability, prices, required specimens, and result duration. Never invent analyses or prices.
-
+Whenever a patient describes symptoms or a health concern, proactively match their condition to the relevant laboratory services in the Services database and recommend the most appropriate analyses, even if the patient did not explicitly ask for test recommendations.
 ====================
 ALREADY COLLECTED
 ====================

@@ -28,8 +28,7 @@ RULES
 1. Never ask for fields already collected.
 2. Ask for ONE missing field at a time.
 3. Match the user's language.
-4. Ask the user for confirmation before saving the complaint.
-5. confirmed=true ONLY if the user clearly confirms.
+5. confirmed=true no confirmation needed.
 6. ready_to_save=true ONLY if both phone and complaint_text exist.
 """
 

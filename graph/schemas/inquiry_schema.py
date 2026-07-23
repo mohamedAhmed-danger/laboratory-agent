@@ -7,5 +7,5 @@ class InquiryLead(BaseModel):
 
 class InquiryResponse(BaseModel):
     reply: str = Field(description="Clean reply to send to the user listing prices or information about the tests.")
-    summary: str = Field(description="An updated English summary of the user's overall state.")
+    summary: str = Field(description="An updated English summary of the user's conversation, including the user's inquiry and the reply. This summary is for internal use only.")
     lead: InquiryLead = Field(description="Structured inquiry data.")
