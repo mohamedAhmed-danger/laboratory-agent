@@ -33,6 +33,7 @@ class KnowledgeGenerationRequest(BaseModel):
     duration: Optional[str] = None
     price: Optional[float] = None
     entity_type: EntityType = EntityType.LAB
+    entity_id: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -42,14 +43,13 @@ class GeneratedKnowledge(BaseModel):
     description: str
     aliases: List[str] = Field(default_factory=list)
     keywords: List[str] = Field(default_factory=list)
-    search_text: str
+    search_text: Optional[str] = ""
 
-    @field_validator("description", "search_text")
-    @classmethod
-    def not_blank(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("field cannot be empty")
-        return v.strip()
+    def construct_search_text(self, item_name: str) -> str:
+        aliases_str = ", ".join(self.aliases) if isinstance(self.aliases, list) else str(self.aliases or "")
+        keywords_str = ", ".join(self.keywords) if isinstance(self.keywords, list) else str(self.keywords or "")
+        self.search_text = f"{item_name}\n{self.description}\nالمرادفات والأسماء البديلة: {aliases_str}\nالكلمات المفتاحية: {keywords_str}".strip()
+        return self.search_text
 
 
 # ---------------------------------------------------------------------------

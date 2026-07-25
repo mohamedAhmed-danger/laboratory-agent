@@ -14,7 +14,7 @@ from .utils import get_gemini_client
 
 logger = logging.getLogger(__name__)
 
-MODEL_NAME = "gemini-2.0-flash"
+MODEL_NAME = "gemini-2.5-flash"
 MAX_RETRIES = 2
 
 
@@ -29,10 +29,18 @@ def _clean_json_response(raw_text: str) -> dict:
 
 
 def _call_gemini(prompt: str) -> dict:
-    genai = get_gemini_client()
-    model = genai.GenerativeModel(MODEL_NAME, system_instruction=SYSTEM_PROMPT)
-    response = model.generate_content(prompt)
-    return _clean_json_response(response.text)
+    client_or_genai = get_gemini_client()
+    if hasattr(client_or_genai, "models"):
+        response = client_or_genai.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config={"system_instruction": SYSTEM_PROMPT}
+        )
+        return _clean_json_response(response.text)
+    else:
+        model = client_or_genai.GenerativeModel(MODEL_NAME, system_instruction=SYSTEM_PROMPT)
+        response = model.generate_content(prompt)
+        return _clean_json_response(response.text)
 
 
 def generate_knowledge(request: KnowledgeGenerationRequest) -> GeneratedKnowledge:
@@ -51,7 +59,9 @@ def generate_knowledge(request: KnowledgeGenerationRequest) -> GeneratedKnowledg
     for attempt in range(1, MAX_RETRIES + 2):
         try:
             raw = _call_gemini(prompt)
-            return GeneratedKnowledge(**raw)
+            obj = GeneratedKnowledge(**raw)
+            obj.construct_search_text(request.name)
+            return obj
         except (json.JSONDecodeError, ValidationError) as e:
             last_error = e
             logger.warning("Generation attempt %s failed: %s", attempt, e)

@@ -6,15 +6,12 @@ from models.models import Bundle, BundleService, LabService, db
 from sqlalchemy.orm import joinedload
 from software_services.laboratory_services import LaboratoryService
 
+from knowledge.schemas import EntityType
+
 
 class BundleServiceLogic:
-    """Service layer for Bundle CRUD. Named BundleServiceLogic (not BundleService)
-    to avoid clashing with models.BundleService, the join-table model.
-    Import in app.py as:
-        from software_services.bundle_services import BundleServiceLogic
-    """
-
-    # ── list / search ─────────────────────────────────────────────────────────
+  
+    # -- list / search -----------------------------------------------------------
 
     @staticmethod
     def get_all_bundles(page=1, per_page=10, search=None):
@@ -29,7 +26,7 @@ class BundleServiceLogic:
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         return pagination, "تم العثور على الباقات"
 
-    # ── single ────────────────────────────────────────────────────────────────
+    # -- single -------------------------------------------------------------------
 
     @staticmethod
     def get_bundle_by_id(bundle_id):
@@ -38,7 +35,7 @@ class BundleServiceLogic:
             return None, "الباقة غير موجودة"
         return bundle, "تم العثور على الباقة"
 
-    # ── create ────────────────────────────────────────────────────────────────
+    # -- create -------------------------------------------------------------------
 
     @staticmethod
     def create_bundle(name, price, laboratory_id=None, patient_instructions=None,
@@ -77,7 +74,7 @@ class BundleServiceLogic:
             db.session.rollback()
             return None, f"حدث خطأ أثناء إنشاء الباقة: {str(e)}"
 
-    # ── update ────────────────────────────────────────────────────────────────
+    # -- update -------------------------------------------------------------------
 
     @staticmethod
     def update_bundle(bundle_id, name=None, price=None, patient_instructions=None,
@@ -111,7 +108,7 @@ class BundleServiceLogic:
             db.session.rollback()
             return None, f"حدث خطأ أثناء التحديث: {str(e)}"
 
-    # ── delete ────────────────────────────────────────────────────────────────
+    # -- delete -------------------------------------------------------------------
 
     @staticmethod
     def delete_bundle(bundle_id):
@@ -126,7 +123,7 @@ class BundleServiceLogic:
             db.session.rollback()
             return None, f"حدث خطأ أثناء الحذف: {str(e)}"
 
-    # ── helper: labs available for the checkbox picker ──────────────────────────
+    # -- helper: labs available for the checkbox picker ---------------------------
 
     @staticmethod
     def get_all_labs_for_picker():

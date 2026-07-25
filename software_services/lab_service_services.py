@@ -4,11 +4,14 @@ software_services/lab_service_services.py
 
 from models.models import LabService, db
 from software_services.laboratory_services import LaboratoryService
+from software_services.base_service import BaseService
+
+from knowledge.schemas import EntityType
 
 
 class LabServiceService:
 
-    # ── list / search ─────────────────────────────────────────────────────────
+    # -- list / search --------------------------------------------------------
 
     @staticmethod
     def get_all_labs(page=1, per_page=10, search=None):
@@ -23,10 +26,9 @@ class LabServiceService:
             )
 
         query = query.order_by(LabService.name.asc())
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        return pagination, "تم العثور على التحاليل"
+        return BaseService.paginate(query, page=page, per_page=per_page, success_msg="تم العثور على التحاليل")
 
-    # ── single ────────────────────────────────────────────────────────────────
+    # -- single -----------------------------------------------------------------
 
     @staticmethod
     def get_lab_by_id(lab_id):
@@ -35,7 +37,7 @@ class LabServiceService:
             return None, "التحليل غير موجود"
         return lab, "تم العثور على التحليل"
 
-    # ── create ────────────────────────────────────────────────────────────────
+    # -- create -------------------------------------------------------------------
 
     @staticmethod
     def create_lab(name, price, laboratory_id=None, specimen=None,
@@ -53,25 +55,17 @@ class LabServiceService:
             except ValueError as e:
                 return None, str(e)
 
-        try:
-            lab = LabService(
-                laboratory_id=laboratory_id,
-                name=name.strip(),
-                price=price,
-                specimen=(specimen or "").strip() or None,
-                durations=(durations or "").strip() or None,
-                patient_instructions=(patient_instructions or "").strip() or None,
-                # description / keywords / alias_names / search_text are left
-                # empty here on purpose — they'll be filled by the AI pipeline later.
-            )
-            db.session.add(lab)
-            db.session.commit()
-            return lab, "تم إنشاء التحليل بنجاح"
-        except Exception as e:
-            db.session.rollback()
-            return None, f"حدث خطأ أثناء إنشاء التحليل: {str(e)}"
+        lab = LabService(
+            laboratory_id=laboratory_id,
+            name=name.strip(),
+            price=price,
+            specimen=(specimen or "").strip() or None,
+            durations=(durations or "").strip() or None,
+            patient_instructions=(patient_instructions or "").strip() or None,
+        )
+        return BaseService.commit(lab, success_msg="تم إنشاء التحليل بنجاح", error_prefix="حدث خطأ أثناء إنشاء التحليل")
 
-    # ── update ────────────────────────────────────────────────────────────────
+    # -- update -------------------------------------------------------------------
 
     @staticmethod
     def update_lab(lab_id, name=None, price=None, specimen=None,
@@ -93,34 +87,21 @@ class LabServiceService:
             lab.durations = durations.strip() or None
         if patient_instructions is not None:
             lab.patient_instructions = patient_instructions.strip() or None
-        # NOTE: description/keywords/alias_names/search_text are intentionally
-        # NOT editable here — they belong to the AI knowledge pipeline (Phase 2).
 
-        try:
-            db.session.commit()
-            return lab, "تم تحديث التحليل بنجاح"
-        except Exception as e:
-            db.session.rollback()
-            return None, f"حدث خطأ أثناء التحديث: {str(e)}"
+        return BaseService.update_commit(lab, success_msg="تم تحديث التحليل بنجاح", error_prefix="حدث خطأ أثناء التحديث")
 
-    # ── delete ────────────────────────────────────────────────────────────────
+    # -- delete -------------------------------------------------------------------
 
     @staticmethod
     def delete_lab(lab_id):
         lab = db.session.get(LabService, lab_id)
         if not lab:
             return None, "التحليل غير موجود"
-        try:
-            db.session.delete(lab)
-            db.session.commit()
-            return lab, "تم حذف التحليل بنجاح"
-        except Exception as e:
-            db.session.rollback()
-            return None, f"حدث خطأ أثناء الحذف: {str(e)}"
+        return BaseService.delete(lab, success_msg="تم حذف التحليل بنجاح", error_prefix="حدث خطأ أثناء الحذف")
 
-    # ── used elsewhere (e.g. inquiry review dropdown) ───────────────────────────
+    # -- used elsewhere (e.g. inquiry review dropdown) -----------------------------
 
     @staticmethod
     def get_all_labs_flat():
-        """Unpaginated list — used where a full dropdown of labs is needed."""
+        """Unpaginated list - used where a full dropdown of labs is needed."""
         return LabService.query.order_by(LabService.name.asc()).all(), "تم العثور على التحاليل"

@@ -36,31 +36,26 @@ class LabService(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     laboratory_id = db.Column(db.Integer, db.ForeignKey('laboratory.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.String(200))
+    description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
-    patient_instructions= db.Column(db.String(200))
+    patient_instructions= db.Column(db.Text)
     durations = db.Column(db.String(100))
-    keywords = db.Column(db.String(200))
-    alias_names= db.Column(db.String(100))
+    keywords = db.Column(db.Text)
+    alias_names= db.Column(db.Text)
     specimen = db.Column(db.String(100))
     search_text = db.Column(db.Text)
-    is_active = db.Column(
-    db.Boolean,
-    default=True
-)
-created_at = db.Column(
-    db.DateTime,
-    default=lambda: datetime.now(timezone.utc)
-)
-
-updated_at = db.Column(
-    db.DateTime,
-    default=lambda: datetime.now(timezone.utc),
-    onupdate=lambda: datetime.now(timezone.utc)
-)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
 
 
-    
 class Bundle(db.Model):
     __tablename__ = "bundles"
 
@@ -94,15 +89,14 @@ class Bundle(db.Model):
         cascade="all, delete-orphan"
     )
     created_at = db.Column(
-    db.DateTime,
-    default=lambda: datetime.now(timezone.utc)
-)
-
-updated_at = db.Column(
-    db.DateTime,
-    default=lambda: datetime.now(timezone.utc),
-    onupdate=lambda: datetime.now(timezone.utc)
-)
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
 
 class BundleService(db.Model):
     __tablename__ = "bundle_services"
@@ -206,6 +200,8 @@ class RequestCounter(db.Model):
     count = db.Column(db.Integer, default=1000)
 
     def decrement(self):
-        if self.count is not None and self.count > 0:
-            self.count -= 1
-            db.session.commit()
+        db.session.query(RequestCounter).filter(
+            RequestCounter.id == self.id,
+            RequestCounter.count > 0
+        ).update({RequestCounter.count: RequestCounter.count - 1})
+        db.session.commit()

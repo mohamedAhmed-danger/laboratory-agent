@@ -1,74 +1,166 @@
 {% extends 'base.html' %}
-{% block title %}الباقات{% endblock %}
-{% block topbar_title %}الباقات{% endblock %}
-{% block topbar_sub %}إدارة باقات التحاليل المعملية{% endblock %}
+{% block title %}الباقات الطبية{% endblock %}
+{% block topbar_title %}الباقات الطبية{% endblock %}
+{% block topbar_sub %}إدارة وتكوين باقات التحاليل المعملية الشاملة{% endblock %}
 
 {% block topbar_actions %}
   <a href="{{ url_for('create_bundle') }}" class="btn btn-primary">
-    <i data-lucide="plus" style="width:16px;height:16px;"></i>
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
     باقة جديدة
   </a>
 {% endblock %}
 
 {% block content %}
 
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon si-blue">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+      </svg>
+    </div>
+    <div>
+      <div class="stat-value">{{ stats.total if stats else pagination.total }}</div>
+      <div class="stat-label">إجمالي الباقات</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon si-amber">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      </svg>
+    </div>
+    <div>
+      <div class="stat-value">{{ stats.with_instructions if stats else '—' }}</div>
+      <div class="stat-label">باقات بتعليمات</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon si-green">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+    </div>
+    <div>
+      <div class="stat-value">{{ stats.active if stats else '—' }}</div>
+      <div class="stat-label">باقات نشطة</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <form method="GET" action="{{ url_for('list_bundles') }}" class="toolbar-filters">
+    <div class="search-box">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input
+        type="text"
+        name="search"
+        placeholder="بحث باسم الباقة..."
+        value="{{ search or '' }}"
+        class="search-input"
+      >
+    </div>
+    <button type="submit" class="btn btn-primary">بحث</button>
+    {% if search %}
+      <a href="{{ url_for('list_bundles') }}" class="btn btn-ghost">مسح</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Table -->
 <div class="card">
   <div class="card-header">
-    <form method="GET" style="display:flex;gap:.5rem;width:100%;">
-      <input type="text" name="search" class="form-control" placeholder="بحث باسم الباقة..."
-             value="{{ search or '' }}">
-      <button type="submit" class="btn btn-ghost">بحث</button>
-    </form>
+    <span class="card-title">قائمة الباقات المتاحة</span>
+    <span class="text-muted" style="font-size:.85rem">{{ pagination.total }} باقة</span>
   </div>
 
-  <div style="display:flex;flex-direction:column;">
-
-    <div style="display:flex;align-items:center;padding:.75rem 1rem;font-weight:600;opacity:.6;font-size:.9rem;border-bottom:1px solid var(--border,#2a2a2a);">
-      <span style="flex:2;">اسم الباقة</span>
-      <span style="flex:1;">السعر</span>
-      <span style="flex:2.5;">التحاليل المشمولة</span>
-      <span style="flex:1;text-align:left;">إجراءات</span>
-    </div>
-
-    {% for bundle in bundles %}
-    <div style="display:flex;align-items:center;padding:.85rem 1rem;border-bottom:1px solid var(--border,#2a2a2a);">
-      <span style="flex:2;font-weight:500;">{{ bundle.name }}</span>
-      <span style="flex:1;font-weight:600;color:var(--primary,#10b981);">{{ "%.2f"|format(bundle.price) }} ج.م</span>
-      
-      <span style="flex:2.5;opacity:.9;font-size:.85rem;display:flex;flex-wrap:wrap;gap:.25rem;">
-        {% if bundle.services %}
-          {% for item in bundle.services %}
-            <span style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:4px;font-size:.8rem;">
-              {{ item.service.name if item.service is defined else item.name }}
-            </span>
-          {% endfor %}
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>اسم الباقة</th>
+          <th>السعر الإجمالي</th>
+          <th>التحاليل المشمولة</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for bundle in bundles %}
+        <tr>
+          <td class="text-muted">{{ bundle.id }}</td>
+          <td>
+            <strong style="color:var(--text-primary);">{{ bundle.name }}</strong>
+          </td>
+          <td>
+            <span style="font-weight:700;color:var(--primary,#10b981);">{{ "%.2f"|format(bundle.price) if bundle.price else '—' }} ج.م</span>
+          </td>
+          <td>
+            <div style="display:flex;flex-wrap:wrap;gap:.3rem;max-width:340px;">
+              {% if bundle.services %}
+                {% for item in bundle.services %}
+                  <span class="pill pill-reviewed" style="background:rgba(255,255,255,0.06);color:var(--text-secondary);border:1px solid rgba(255,255,255,0.1);font-size:0.75rem;padding:2px 8px;">
+                    {{ item.service.name if item.service is defined else item.name }}
+                  </span>
+                {% endfor %}
+              {% else %}
+                <span class="text-muted" style="font-size:0.85rem;">لا توجد تحاليل مشمولة</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <div style="display:flex;gap:.4rem;align-items:center;">
+              <a href="{{ url_for('review_bundle_knowledge', bundle_id=bundle.id) }}" class="btn btn-ghost btn-sm" title="المعرفة الذكية" style="color:#8b5cf6;border-color:rgba(139,92,246,0.2);">
+                ✨ المعرفة
+              </a>
+              <a href="{{ url_for('edit_bundle', bundle_id=bundle.id) }}" class="btn btn-ghost btn-sm">تعديل</a>
+              <form method="POST" action="{{ url_for('delete_bundle', bundle_id=bundle.id) }}"
+                    onsubmit="return confirm('هل أنت متأكد من حذف هذه الباقة؟')">
+                <button type="submit" class="btn btn-danger btn-sm">حذف</button>
+              </form>
+            </div>
+          </td>
+        </tr>
         {% else %}
-          <span style="opacity:.5;">لا توجد تحاليل</span>
-        {% endif %}
-      </span>
-
-      <span style="flex:1;display:flex;gap:.5rem;justify-content:flex-start;">
-        <a href="{{ url_for('edit_bundle', bundle_id=bundle.id) }}" class="btn btn-ghost btn-sm">تعديل</a>
-        <form action="{{ url_for('delete_bundle', bundle_id=bundle.id) }}" method="POST"
-              onsubmit="event.preventDefault(); confirmDelete(this);">
-          <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-        </form>
-      </span>
-    </div>
-    {% else %}
-    <div style="padding:2rem;text-align:center;opacity:.6;">لا توجد باقات بعد</div>
-    {% endfor %}
-
+        <tr>
+          <td colspan="5" style="text-align:center;padding:2.5rem;color:var(--text-muted);">
+            {% if search %}
+              لا توجد باقات تطابق بحثك
+            {% else %}
+              لا توجد باقات بعد — <a href="{{ url_for('create_bundle') }}" style="color:var(--primary);">أضف أول باقة</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 
+  <!-- Pagination -->
   {% if pagination and pagination.pages > 1 %}
   <div class="pagination">
     {% if pagination.has_prev %}
-      <a href="{{ url_for('list_bundles', page=pagination.prev_num, search=search) }}">السابق</a>
+      <a href="{{ url_for('list_bundles', page=pagination.prev_num, search=search) }}" class="page-btn">→</a>
     {% endif %}
-    <span>{{ pagination.page }} / {{ pagination.pages }}</span>
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <a href="{{ url_for('list_bundles', page=p, search=search) }}"
+           class="page-btn {% if p == pagination.page %}active{% endif %}">{{ p }}</a>
+      {% else %}
+        <span class="page-btn" style="opacity:.4">…</span>
+      {% endif %}
+    {% endfor %}
     {% if pagination.has_next %}
-      <a href="{{ url_for('list_bundles', page=pagination.next_num, search=search) }}">التالي</a>
+      <a href="{{ url_for('list_bundles', page=pagination.next_num, search=search) }}" class="page-btn">←</a>
     {% endif %}
   </div>
   {% endif %}

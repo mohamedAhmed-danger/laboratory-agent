@@ -1,19 +1,12 @@
 """
 utils.py
 Shared helper functions for the Knowledge Pipeline.
-
-Holds:
-- Two separate SQLAlchemy engines (main app DB vs. pgvector DB),
-  as requested: they may be the same physical Postgres server or
-  two different servers, but they are ALWAYS opened as two
-  independent engines/connections.
-- Text normalization helpers used by the duplicate checker.
-- A small Gemini client helper.
 """
 
 import os
 import re
 import unicodedata
+import warnings
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine
@@ -22,15 +15,13 @@ from sqlalchemy.orm import sessionmaker
 # ---------------------------------------------------------------------------
 # Database engines
 # ---------------------------------------------------------------------------
-# MAIN_DATABASE_URL -> normal Postgres DB (labs, bundles, etc.)
-# VECTOR_DATABASE_URL -> Postgres + pgvector extension.
-# These can point to the same physical server or different ones, but the
-# pipeline ALWAYS treats them as two separate engines/connections, never
-# a shared session, so the vector store logic stays decoupled from the
-# main app DB.
+MAIN_DATABASE_URL = os.environ.get("MAIN_DATABASE_URL") or os.environ.get("SQLALCHEMY_DATABASE_URI") or "postgresql://postgres:Mo162534@localhost:5432/laboratory_db"
+VECTOR_DATABASE_URL = os.environ.get("VECTOR_DATABASE_URL") or MAIN_DATABASE_URL
 
-MAIN_DATABASE_URL = os.environ["MAIN_DATABASE_URL"]
-VECTOR_DATABASE_URL = os.environ["VECTOR_DATABASE_URL"]
+if MAIN_DATABASE_URL.startswith("postgresql://"):
+    MAIN_DATABASE_URL = MAIN_DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+if VECTOR_DATABASE_URL.startswith("postgresql://"):
+    VECTOR_DATABASE_URL = VECTOR_DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 main_engine = create_engine(MAIN_DATABASE_URL, pool_pre_ping=True, future=True)
 vector_engine = create_engine(VECTOR_DATABASE_URL, pool_pre_ping=True, future=True)
@@ -42,6 +33,15 @@ VectorSession = sessionmaker(bind=vector_engine, future=True)
 @contextmanager
 def main_session():
     """Yields a session bound to the main app database."""
+    try:
+        from flask import current_app
+        if current_app:
+            from models.models import db
+            yield db.session
+            return
+    except Exception:
+        pass
+
     session = MainSession()
     try:
         yield session
@@ -71,10 +71,7 @@ def vector_session():
 # Text normalization (used by duplicate_checker.py)
 # ---------------------------------------------------------------------------
 def normalize_text(text: str) -> str:
-    """
-    Lowercases, strips accents/punctuation, and collapses whitespace.
-    e.g. "  CBC - Complete Blood Count! " -> "cbc complete blood count"
-    """
+    """Lowercases, strips accents/punctuation, and collapses whitespace."""
     if not text:
         return ""
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
@@ -89,10 +86,17 @@ def normalize_text(text: str) -> str:
 # ---------------------------------------------------------------------------
 def get_gemini_client():
     """
-    Returns a configured google-generativeai module ready to call.
-    Requires GEMINI_API_KEY in the environment.
+    Returns a configured google.genai Client or legacy genai module.
     """
-    import google.generativeai as genai
-
-    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    return genai
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    try:
+        from google import genai
+        if api_key:
+            return genai.Client(api_key=api_key)
+        return genai.Client()
+    except Exception:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            return genai

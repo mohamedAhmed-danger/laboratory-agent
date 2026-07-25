@@ -1,6 +1,17 @@
 from models.models import Laboratory, db
+from software_services.base_service import BaseService
 
 class LaboratoryService:
+
+    @staticmethod
+    def get_current_laboratory_id():
+        """Get default laboratory ID or create a default lab record if none exists."""
+        lab = Laboratory.query.first()
+        if not lab:
+            lab = Laboratory(name="المعمل الرئيسي", address="الإسكندرية", info="معمل تحاليل رئيسي")
+            db.session.add(lab)
+            db.session.commit()
+        return lab.id
 
     @staticmethod
     def get_all_laboratories(page=1, per_page=10, search=None):
@@ -13,13 +24,8 @@ class LaboratoryService:
                 (Laboratory.address.ilike(f"%{search}%"))
             )
 
-        try:
-            pagination = query.order_by(Laboratory.id.desc()).paginate(
-                page=page, per_page=per_page, error_out=False
-            )
-            return pagination, "تم جلب معامل التحاليل بنجاح"
-        except Exception as e:
-            return None, f"حدث خطأ أثناء الجلب: {str(e)}"
+        query = query.order_by(Laboratory.id.desc())
+        return BaseService.paginate(query, page=page, per_page=per_page, success_msg="تم جلب معامل التحاليل بنجاح")
 
     @staticmethod
     def get_laboratory_by_id(lab_id):
@@ -40,13 +46,7 @@ class LaboratoryService:
             address=address.strip() if address else None,
             info=info.strip() if info else None
         )
-        try:
-            db.session.add(lab)
-            db.session.commit()
-            return lab, "تم إضافة المعمل بنجاح"
-        except Exception as e:
-            db.session.rollback()
-            return None, f"حدث خطأ أثناء الإضافة: {str(e)}"
+        return BaseService.commit(lab, success_msg="تم إضافة المعمل بنجاح", error_prefix="حدث خطأ أثناء الإضافة")
 
     @staticmethod
     def update_laboratory(lab_id, name=None, address=None, info=None):
@@ -62,12 +62,7 @@ class LaboratoryService:
         if info is not None:
             lab.info = info.strip() if info else None
 
-        try:
-            db.session.commit()
-            return lab, "تم تحديث بيانات المعمل بنجاح"
-        except Exception as e:
-            db.session.rollback()
-            return None, f"حدث خطأ أثناء التحديث: {str(e)}"
+        return BaseService.update_commit(lab, success_msg="تم تحديث بيانات المعمل بنجاح", error_prefix="حدث خطأ أثناء التحديث")
 
     @staticmethod
     def delete_laboratory(lab_id):
@@ -76,10 +71,4 @@ class LaboratoryService:
         if not lab:
             return None, "المعمل غير موجود"
 
-        try:
-            db.session.delete(lab)
-            db.session.commit()
-            return lab, "تم حذف المعمل بنجاح"
-        except Exception as e:
-            db.session.rollback()
-            return None, f"حدث خطأ أثناء الحذف: {str(e)}"
+        return BaseService.delete(lab, success_msg="تم حذف المعمل بنجاح", error_prefix="حدث خطأ أثناء الحذف")

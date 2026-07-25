@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Ensure instance folder exists for SQLite DB
+# Ensure instance folder exists for application uploads/logs
 RUN mkdir -p /app/instance
 
 EXPOSE 4500

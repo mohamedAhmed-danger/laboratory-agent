@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}المختبر{% endblock %} — لوحة التحكم</title>
+  <title>{% block title %}المختبر — لوحة التحكم{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
@@ -12,9 +12,9 @@
 </head>
 <body>
 
-<!-- Mobile sidebar toggle -->
+<!-- Mobile sidebar toggle button -->
 <button class="sidebar-toggle" id="sidebarToggle" aria-label="فتح القائمة">
-  <span></span><span></span><span></span>
+  <i data-lucide="menu"></i>
 </button>
 
 <!-- Mobile overlay -->
@@ -23,18 +23,29 @@
 <!-- ── SIDEBAR ─────────────────────────────────────────────── -->
 <aside class="sidebar" id="sidebar">
 
-  <div class="sidebar-logo">
-    <img src="{{ url_for('static', filename='images/logo.png') }}"
-         alt="شعار المختبر"
-         onerror="this.style.display='none'">
-    <div class="lab-name">مختبر الإسكندرية</div>
-    <div class="lab-sub">لوحة التحكم</div>
-    <div class="sidebar-status">النظام نشط</div>
+  <div class="sidebar-header">
+    <div class="brand-badge">
+      <i data-lucide="flask-conical" class="brand-icon"></i>
+      <div>
+        <div class="lab-name">مختبر الإسكندرية</div>
+        <div class="lab-sub">نظام الأتمتة الطبي الذكي</div>
+      </div>
+    </div>
+    <div class="sidebar-status">
+      <span class="status-pulse"></span>
+      النظام نشط
+    </div>
   </div>
 
-  <div class="nav-section">
+  <nav class="nav-section">
 
     <p class="nav-section-label">الرئيسية</p>
+
+    <a href="{{ url_for('dashboard') }}"
+       class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+      <i data-lucide="layout-dashboard" class="nav-icon"></i>
+      لوحة التحكم
+    </a>
 
     <a href="{{ url_for('list_inquiries') }}"
        class="nav-item {% if request.endpoint == 'list_inquiries' %}active{% endif %}">
@@ -57,26 +68,32 @@
       الشكاوى
     </a>
 
-   <a href="{{ url_for('list_labs') }}"
-   class="nav-item {% if request.endpoint in ['list_labs','create_lab','edit_lab'] %}active{% endif %}">
-  <i data-lucide="clipboard-list" class="nav-icon"></i>
-  التحاليل
-</a>
+    <p class="nav-section-label">الخدمات والباقات</p>
 
-<a href="{{ url_for('list_bundles') }}"
-   class="nav-item {% if request.endpoint in ['list_bundles','create_bundle','edit_bundle'] %}active{% endif %}">
-  <i data-lucide="package" class="nav-icon"></i>
-  الباقات
-</a>
+    <a href="{{ url_for('list_labs') }}"
+       class="nav-item {% if request.endpoint in ['list_labs','create_lab','edit_lab'] %}active{% endif %}">
+      <i data-lucide="clipboard-list" class="nav-icon"></i>
+      التحاليل الطبية
+    </a>
 
-    <p class="nav-section-label">الإعدادات</p>
+    <a href="{{ url_for('list_bundles') }}"
+       class="nav-item {% if request.endpoint in ['list_bundles','create_bundle','edit_bundle'] %}active{% endif %}">
+      <i data-lucide="package" class="nav-icon"></i>
+      الباقات الشاملة
+    </a>
 
-   
+    <p class="nav-section-label">الإعدادات والمستخدمين</p>
 
     <a href="{{ url_for('list_laboratories') }}"
-       class="nav-item {% if request.endpoint == 'laboratory_settings' %}active{% endif %}">
-      <i data-lucide="flask-conical" class="nav-icon"></i>
-      المعامل
+       class="nav-item {% if request.endpoint in ['list_laboratories','create_laboratory','edit_laboratory'] %}active{% endif %}">
+      <i data-lucide="building-2" class="nav-icon"></i>
+      إدارة المعامل
+    </a>
+
+    <a href="{{ url_for('list_platforms') }}"
+       class="nav-item {% if request.endpoint in ['list_platforms','create_platform','edit_platform'] %}active{% endif %}">
+      <i data-lucide="share-2" class="nav-icon"></i>
+      منصات التواصل
     </a>
 
     <a href="{{ url_for('users') }}"
@@ -85,17 +102,17 @@
       المستخدمون
     </a>
 
-  </div>
+  </nav>
 
   <div class="sidebar-footer">
     <div class="sidebar-user">
-      <div class="avatar">{{ current_user.username[0]|upper }}</div>
+      <div class="avatar">{{ current_user.username[0]|upper if current_user.username else 'A' }}</div>
       <div class="user-info">
-        <div class="user-name">{{ current_user.username }}</div>
+        <div class="user-name">{{ current_user.username if current_user.username else 'Admin' }}</div>
         <div class="user-role">مدير النظام</div>
       </div>
       <a href="{{ url_for('logout') }}" class="logout-btn" title="تسجيل الخروج">
-        <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+        <i data-lucide="log-out"></i>
       </a>
     </div>
   </div>
@@ -108,7 +125,10 @@
     <div class="flash-container">
       {% for category, message in messages %}
         <div class="flash-msg flash-{{ category }}">
-          <span>{{ message }}</span>
+          <div class="flash-content">
+            <i data-lucide="info" class="flash-icon"></i>
+            <span>{{ message }}</span>
+          </div>
           <button class="flash-close" onclick="this.parentElement.remove()">&#10005;</button>
         </div>
       {% endfor %}
@@ -119,17 +139,17 @@
 <!-- ── DELETE MODAL ───────────────────────────────────────── -->
 <div class="modal-overlay" id="deleteModal">
   <div class="modal-box">
-    <div class="modal-icon">
-      <i data-lucide="trash-2" style="width:24px;height:24px;"></i>
+    <div class="modal-icon text-danger">
+      <i data-lucide="trash-2"></i>
     </div>
     <h3 class="modal-title">تأكيد الحذف</h3>
     <p class="modal-body">
       هل أنت متأكد من حذف هذا العنصر؟<br>
-      لا يمكن التراجع عن هذا الإجراء.
+      لا يمكن التراجع عن هذا الإجراء بعد إتمامه.
     </p>
     <div class="modal-actions">
       <button onclick="closeDeleteModal()" class="btn btn-ghost">إلغاء</button>
-      <button id="confirmDeleteBtn" class="btn btn-danger">حذف</button>
+      <button id="confirmDeleteBtn" class="btn btn-danger">تأكيد الحذف</button>
     </div>
   </div>
 </div>
@@ -138,15 +158,15 @@
 <div class="main-wrapper">
 
   <!-- Topbar -->
-  <div class="topbar">
+  <header class="topbar">
     <div class="topbar-left">
-      <div class="topbar-title">{% block topbar_title %}{% endblock %}</div>
-      <div class="topbar-sub">{% block topbar_sub %}{% endblock %}</div>
+      <h1 class="topbar-title">{% block topbar_title %}{% endblock %}</h1>
+      <p class="topbar-sub">{% block topbar_sub %}{% endblock %}</p>
     </div>
     <div class="topbar-actions">
       {% block topbar_actions %}{% endblock %}
     </div>
-  </div>
+  </header>
 
   <!-- Page content -->
   <main class="main-content">
@@ -154,20 +174,22 @@
   </main>
 
   <!-- Footer -->
-  <div class="site-footer">
-    Developed by
-    <a href="https://revyai.tech" target="_blank">RevyAI</a>
-    &nbsp;·&nbsp;
-    <a href="https://wa.me/201554019172" target="_blank">+20 15 54019172</a>
-  </div>
+  <footer class="site-footer">
+    <span>نظام المختبر الطبي الذكي &copy; {{ 2026 }}</span>
+    <span class="footer-divider">•</span>
+    <span>تطوير <a href="https://revyai.tech" target="_blank" rel="noopener">RevyAI</a> (<a href="https://wa.me/201554019172" target="_blank" rel="noopener" style="color:#25d366;font-weight:700;">01554019172</a>)</span>
+  </footer>
 
 </div>
 
 <!-- ── SCRIPTS ────────────────────────────────────────────── -->
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
 <script>
-  lucide.createIcons();
+  // Initialize Lucide icons
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+  });
 
   /* ── Sidebar mobile toggle ── */
   const sidebar        = document.getElementById('sidebar');
@@ -183,39 +205,50 @@
     sidebarOverlay.classList.remove('open');
   }
 
-  sidebarToggle.addEventListener('click', openSidebar);
-  sidebarOverlay.addEventListener('click', closeSidebar);
+  if (sidebarToggle) sidebarToggle.addEventListener('click', openSidebar);
+  if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
   /* ── Delete modal ── */
   let _pendingForm = null;
 
   function confirmDelete(form) {
     _pendingForm = form;
-    document.getElementById('deleteModal').classList.add('open');
-    lucide.createIcons();
+    const modal = document.getElementById('deleteModal');
+    if (modal) {
+      modal.classList.add('open');
+      if (window.lucide) lucide.createIcons();
+    }
   }
 
   function closeDeleteModal() {
     _pendingForm = null;
-    document.getElementById('deleteModal').classList.remove('open');
+    const modal = document.getElementById('deleteModal');
+    if (modal) modal.classList.remove('open');
   }
 
-  document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
-    if (_pendingForm) _pendingForm.submit();
-  });
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', function () {
+      if (_pendingForm) _pendingForm.submit();
+    });
+  }
 
-  document.getElementById('deleteModal').addEventListener('click', function (e) {
-    if (e.target === this) closeDeleteModal();
-  });
+  const deleteModal = document.getElementById('deleteModal');
+  if (deleteModal) {
+    deleteModal.addEventListener('click', function (e) {
+      if (e.target === this) closeDeleteModal();
+    });
+  }
 
   /* ── Auto-dismiss flash messages ── */
   setTimeout(() => {
     document.querySelectorAll('.flash-msg').forEach(el => {
-      el.style.transition = 'opacity 0.4s ease';
+      el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
       el.style.opacity = '0';
+      el.style.transform = 'translateY(-10px)';
       setTimeout(() => el.remove(), 400);
     });
-  }, 4000);
+  }, 4500);
 </script>
 
 {% block scripts %}{% endblock %}

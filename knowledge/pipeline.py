@@ -1,11 +1,22 @@
+"""
+pipeline.py
+Main orchestrator. Coordinates knowledge generation for an EXISTING
+Lab/Bundle (duplicate checking happens earlier, at creation time -
+see lab_service_services.py / bundle_services.py - not here, since by
+the time this runs the entity already exists and would always match
+itself).
+
+    Generate Knowledge (LLM) -> Validate -> Review Page
+    -> [Admin Approval] -> Update PostgreSQL -> Generate Embedding
+    -> Insert into Vector Database -> Done
+"""
 
 import logging
-from .duplicate_checker import check_duplicate
+
 from .generator import generate_knowledge, regenerate_knowledge
 from .embedding import generate_embedding
 from .schemas import (
     ApprovedKnowledge,
-    DuplicateCheckResult,
     EntityType,
     GeneratedKnowledge,
     KnowledgeGenerationRequest,
@@ -18,12 +29,6 @@ from .vector_store import upsert_vector
 logger = logging.getLogger(__name__)
 
 
-class DuplicateFoundError(Exception):
-    def __init__(self, result: DuplicateCheckResult):
-        self.result = result
-        super().__init__(f"Duplicate found: {result.matched_name} (score={result.score})")
-
-
 class KnowledgeValidationError(Exception):
     def __init__(self, errors: list[str]):
         self.errors = errors
@@ -32,26 +37,20 @@ class KnowledgeValidationError(Exception):
 
 def run_pre_approval_stage(request: KnowledgeGenerationRequest) -> GeneratedKnowledge:
     """
-    Runs: Duplicate Checker -> Generate Knowledge -> Validate.
+    Runs: Generate Knowledge (LLM) -> Validate.
     Returns the validated GeneratedKnowledge to be shown on the Review Page.
-    Raises DuplicateFoundError or KnowledgeValidationError if either step fails.
+    Raises KnowledgeValidationError if validation fails.
     """
-    # Step 1 - Duplicate Checker
-    dup_result = check_duplicate(request.name, request.entity_type)
-    if dup_result.is_duplicate:
-        logger.info("Duplicate detected for '%s': %s", request.name, dup_result)
-        raise DuplicateFoundError(dup_result)
-
-    # Step 2 - Generate Knowledge (LLM)
+    # Step 1 - Generate Knowledge (LLM)
     generated = generate_knowledge(request)
 
-    # Step 3 - Validate
+    # Step 2 - Validate
     validation = validate_knowledge(generated)
     if not validation.is_valid:
         logger.warning("Validation failed for '%s': %s", request.name, validation.errors)
         raise KnowledgeValidationError(validation.errors)
 
-    # Step 4 happens client-side (Review Page) - nothing written yet.
+    # Step 3 happens client-side (Review Page) - nothing written yet.
     return generated
 
 
@@ -71,10 +70,8 @@ def regenerate(
 def run_post_approval_stage(entity_id: int, entity_type: EntityType, name: str,
                              final_knowledge: GeneratedKnowledge) -> None:
     """
-    Runs after the admin clicks "Approve" (possibly having edited the
-    description/keywords/aliases/search_text first):
-
-        Update PostgreSQL -> Generate Embedding -> Insert into Vector DB
+    Runs after the admin clicks "Approve":
+        Update PostgreSQL -> Generate Embedding -> Insert into Vector Database
     """
     approved = ApprovedKnowledge(
         entity_id=entity_id,
@@ -82,13 +79,8 @@ def run_post_approval_stage(entity_id: int, entity_type: EntityType, name: str,
         **final_knowledge.model_dump(),
     )
 
-    # Step 5 - PostgreSQL Update
     update_knowledge(approved)
-
-    # Step 6 - Embedding Generation
     embedding = generate_embedding(name, approved)
-
-    # Step 7 - Vector Database Update
     metadata = VectorMetadata(id=entity_id, type=entity_type, name=name)
     upsert_vector(metadata, embedding)
 

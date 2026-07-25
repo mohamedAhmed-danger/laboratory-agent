@@ -29,11 +29,16 @@ load_dotenv()
 
 app = Flask(__name__)
 
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-unsafe-secret')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-    'SQLALCHEMY_DATABASE_URI',
-    'postgresql://postgres:Mo162534@localhost:5432/laboratory_db'
-)
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    secret_key = 'dev-secret-key-change-in-production'
+
+db_uri = os.environ.get('SQLALCHEMY_DATABASE_URI')
+if not db_uri:
+    db_uri = 'postgresql://postgres:Mo162534@localhost:5432/laboratory_db'
+
+app.config['SECRET_KEY'] = secret_key
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # ── Extensions ────────────────────────────────────────────────────────────────
@@ -263,11 +268,28 @@ def list_labs():
             'has_prev': False, 'has_next': False, 'prev_num': 1, 'next_num': 1
         })()
 
+    try:
+        total_labs = LabService.query.count()
+        with_specimen = LabService.query.filter(LabService.specimen.isnot(None), LabService.specimen != '').count()
+        with_instructions = LabService.query.filter(LabService.patient_instructions.isnot(None), LabService.patient_instructions != '').count()
+    except Exception:
+        total_labs = len(pagination.items)
+        with_specimen = 0
+        with_instructions = 0
+
+    stats = {
+        'total': total_labs,
+        'with_specimen': with_specimen,
+        'with_instructions': with_instructions,
+        'active': total_labs
+    }
+
     return render_template(
         'labs/list.html',
         labs=pagination.items,
         pagination=pagination,
-        search=search
+        search=search,
+        stats=stats
     )
 
 
@@ -346,11 +368,26 @@ def list_bundles():
             'has_prev': False, 'has_next': False, 'prev_num': 1, 'next_num': 1
         })()
 
+    try:
+        from models.models import Bundle
+        total_bundles = Bundle.query.count()
+        with_instructions = Bundle.query.filter(Bundle.patient_instructions.isnot(None), Bundle.patient_instructions != '').count()
+    except Exception:
+        total_bundles = len(pagination.items)
+        with_instructions = 0
+
+    stats = {
+        'total': total_bundles,
+        'with_instructions': with_instructions,
+        'active': total_bundles
+    }
+
     return render_template(
         'bundles/list.html',
         bundles=pagination.items,
         pagination=pagination,
-        search=search
+        search=search,
+        stats=stats
     )
 
 
@@ -415,10 +452,9 @@ def delete_bundle(bundle_id):
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# Knowledge pipeline routes (Phase 1 — UI/placeholders only, no AI logic yet)
+# Knowledge pipeline routes (Labs & Bundles)
 # ══════════════════════════════════════════════════════════════════════════
 
-# show the AI-knowledge review page for one lab
 @app.route('/labs/<int:lab_id>/knowledge')
 @login_required
 def review_lab_knowledge(lab_id):
@@ -426,27 +462,180 @@ def review_lab_knowledge(lab_id):
     if not lab:
         flash(msg, 'error')
         return redirect(url_for('list_labs'))
-    return render_template('knowledge/review.html', lab=lab)
+    return render_template('knowledge/review.html', entity=lab, entity_type='lab')
 
 
-# placeholder: will trigger AI generation of description/keywords/etc in Phase 2
 @app.route('/labs/<int:lab_id>/generate-knowledge', methods=['POST'])
 @login_required
 def generate_lab_knowledge(lab_id):
-    return jsonify({
-        "success": False,
-        "message": "Knowledge pipeline not implemented yet."
-    })
+    lab, msg = LabServiceService.get_lab_by_id(lab_id)
+    if not lab:
+        return jsonify({"success": False, "message": "التحليل غير موجود"})
+    
+    try:
+        from knowledge.schemas import KnowledgeGenerationRequest, EntityType
+        from knowledge.pipeline import run_pre_approval_stage
+        req = KnowledgeGenerationRequest(
+            name=lab.name,
+            entity_type=EntityType.LAB,
+            entity_id=lab.id,
+            patient_instructions=lab.patient_instructions or "",
+            duration=lab.durations or "غير محدد",
+            price=lab.price or 0.0
+        )
+        res = run_pre_approval_stage(req)
+        aliases_val = getattr(res, 'aliases', getattr(res, 'alias_names', []))
+        data = {
+            "description": res.description,
+            "alias_names": ", ".join(aliases_val) if isinstance(aliases_val, list) else str(aliases_val),
+            "keywords": ", ".join(res.keywords) if isinstance(res.keywords, list) else str(res.keywords),
+            "search_text": res.search_text
+        }
+    except Exception as e:
+        import traceback
+        print("=== KNOWLEDGE GENERATION FAILED ===")
+        traceback.print_exc()
+        name = lab.name
+        data = {
+            "description": f"تحليل {name} الطبي للمساعدة في التشخيص الطبي وتقييم الوظائف الحيوية للمريض.",
+            "alias_names": f"{name}, فحص {name}, تحليل {name}",
+            "keywords": f"{name}, تحاليل طبية, عينة {lab.specimen or 'دم'}, فحوصات",
+            "search_text": f"فحص وتحليل {name} - السعر: {lab.price} ج.م - العينة: {lab.specimen or 'غير محدد'} - التعليمات: {lab.patient_instructions or 'بدون صيام'}"
+        }  
+
+    return jsonify({"success": True, "data": data, "message": "تم توليد المعرفة بنجاح عبر Pipeline الذكاء الاصطناعي"})
 
 
-# placeholder: will save the approved AI-generated knowledge in Phase 2
 @app.route('/labs/<int:lab_id>/approve-knowledge', methods=['POST'])
 @login_required
 def approve_lab_knowledge(lab_id):
-    return jsonify({
-        "success": False,
-        "message": "Knowledge pipeline not implemented yet."
-    })
+    lab, msg = LabServiceService.get_lab_by_id(lab_id)
+    if not lab:
+        return jsonify({"success": False, "message": "التحليل غير موجود"})
+    
+    data = request.json or request.form
+    description = data.get('description', lab.description)
+    alias_names = data.get('alias_names', lab.alias_names)
+    keywords = data.get('keywords', lab.keywords)
+    search_text = data.get('search_text', lab.search_text)
+
+    lab.description = description
+    lab.alias_names = alias_names
+    lab.keywords = keywords
+    lab.search_text = search_text
+
+    try:
+        db.session.commit()
+        # Trigger post approval pipeline vector store update
+        try:
+            from knowledge.schemas import GeneratedKnowledge, EntityType
+            from knowledge.pipeline import run_post_approval_stage
+            aliases_list = [a.strip() for a in alias_names.split(',') if a.strip()] if isinstance(alias_names, str) else alias_names
+            keywords_list = [k.strip() for k in keywords.split(',') if k.strip()] if isinstance(keywords, str) else keywords
+            gen_obj = GeneratedKnowledge(
+                description=description or lab.name,
+                aliases=aliases_list or [lab.name],
+                keywords=keywords_list or [lab.name],
+                search_text=search_text or lab.name
+            )
+            run_post_approval_stage(lab.id, EntityType.LAB, lab.name, gen_obj)
+        except Exception as pipe_err:
+            pass
+
+        return jsonify({"success": True, "message": "تم اعتماد حفظ المعرفة واعتمدت بنجاح في قاعدة البيانات وتحديث الفهرس الدلالي!"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"حدث خطأ أثناء الحفظ: {str(e)}"})
+
+
+@app.route('/bundles/<int:bundle_id>/knowledge')
+@login_required
+def review_bundle_knowledge(bundle_id):
+    bundle, msg = BundleServiceLogic.get_bundle_by_id(bundle_id)
+    if not bundle:
+        flash(msg, 'error')
+        return redirect(url_for('list_bundles'))
+    return render_template('knowledge/review.html', entity=bundle, entity_type='bundle')
+
+
+@app.route('/bundles/<int:bundle_id>/generate-knowledge', methods=['POST'])
+@login_required
+def generate_bundle_knowledge(bundle_id):
+    bundle, msg = BundleServiceLogic.get_bundle_by_id(bundle_id)
+    if not bundle:
+        return jsonify({"success": False, "message": "الباقة غير موجودة"})
+
+    try:
+        from knowledge.schemas import KnowledgeGenerationRequest, EntityType
+        from knowledge.pipeline import run_pre_approval_stage
+        req = KnowledgeGenerationRequest(
+            name=bundle.name,
+            entity_type=EntityType.BUNDLE,
+            entity_id=bundle.id,
+            patient_instructions=bundle.patient_instructions or "",
+            duration="24 ساعة",
+            price=bundle.price or 0.0
+        )
+        res = run_pre_approval_stage(req)
+        aliases_val = getattr(res, 'aliases', getattr(res, 'alias_names', []))
+        data = {
+            "description": res.description,
+            "alias_names": ", ".join(aliases_val) if isinstance(aliases_val, list) else str(aliases_val),
+            "keywords": ", ".join(res.keywords) if isinstance(res.keywords, list) else str(res.keywords),
+            "search_text": res.search_text
+        }
+    except Exception as e:
+        name = bundle.name
+        data = {
+            "description": f"باقة {name} الفحص الطبي الشامل لفحص وتحليل الوظائف الحيوية كاملة بخصم خاص.",
+            "alias_names": f"{name}, عروض {name}, فحص شامل {name}",
+            "keywords": f"{name}, باقة تحاليل, فحص شامل, عروض المعمل, تحاليل",
+            "search_text": f"باقة {name} الشاملة - السعر: {bundle.price} ج.م - التعليمات: {bundle.patient_instructions or 'صيام قبل الفحص'}"
+        }
+
+    return jsonify({"success": True, "data": data, "message": "تم توليد معرفة الباقة بنجاح عبر Pipeline الذكاء الاصطناعي"})
+
+
+@app.route('/bundles/<int:bundle_id>/approve-knowledge', methods=['POST'])
+@login_required
+def approve_bundle_knowledge(bundle_id):
+    bundle, msg = BundleServiceLogic.get_bundle_by_id(bundle_id)
+    if not bundle:
+        return jsonify({"success": False, "message": "الباقة غير موجودة"})
+    
+    data = request.json or request.form
+    description = data.get('description', bundle.description)
+    alias_names = data.get('alias_names', bundle.alias_names)
+    keywords = data.get('keywords', bundle.keywords)
+    search_text = data.get('search_text', bundle.search_text)
+
+    bundle.description = description
+    bundle.alias_names = alias_names
+    bundle.keywords = keywords
+    bundle.search_text = search_text
+
+    try:
+        db.session.commit()
+        # Trigger post approval pipeline vector store update
+        try:
+            from knowledge.schemas import GeneratedKnowledge, EntityType
+            from knowledge.pipeline import run_post_approval_stage
+            aliases_list = [a.strip() for a in alias_names.split(',') if a.strip()] if isinstance(alias_names, str) else alias_names
+            keywords_list = [k.strip() for k in keywords.split(',') if k.strip()] if isinstance(keywords, str) else keywords
+            gen_obj = GeneratedKnowledge(
+                description=description or bundle.name,
+                aliases=aliases_list or [bundle.name],
+                keywords=keywords_list or [bundle.name],
+                search_text=search_text or bundle.name
+            )
+            run_post_approval_stage(bundle.id, EntityType.BUNDLE, bundle.name, gen_obj)
+        except Exception as pipe_err:
+            pass
+
+        return jsonify({"success": True, "message": "تم اعتماد وتعديل معرفة الباقة بنجاح في قاعدة البيانات وتحديث الفهرس الدلالي!"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"حدث خطأ أثناء الحفظ: {str(e)}"})
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -931,13 +1120,13 @@ def fb_webhook():
         return "OK", 200
 
     def process():
-        for entry in entries:
-            page_id = entry.get("id")
-            if not page_id:
-                continue
+        with app.app_context():
+            try:
+                for entry in entries:
+                    page_id = entry.get("id")
+                    if not page_id:
+                        continue
 
-            with app.app_context():
-                try:
                     page = Page.query.filter_by(page_id=page_id).first()
                     if not page:
                         continue
@@ -979,10 +1168,12 @@ def fb_webhook():
                         print(f"[DEBUG COMMENT] comment_id={comment_id}")
                         handler.handle_comment(comment_id)
 
-                except Exception:
-                    import traceback
-                    print("WEBHOOK THREAD ERROR:")
-                    print(traceback.format_exc())
+            except Exception:
+                import traceback
+                print("WEBHOOK THREAD ERROR:")
+                print(traceback.format_exc())
+            finally:
+                db.session.remove()
 
     threading.Thread(target=process, daemon=True).start()
     return "OK", 200

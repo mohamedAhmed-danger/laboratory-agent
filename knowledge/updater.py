@@ -15,7 +15,7 @@ from .utils import main_session
 logger = logging.getLogger(__name__)
 
 TABLE_BY_TYPE = {
-    EntityType.LAB: "labs",
+    EntityType.LAB: "labservices",
     EntityType.BUNDLE: "bundles",
 }
 
