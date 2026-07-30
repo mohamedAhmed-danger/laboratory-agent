@@ -90,9 +90,20 @@ def generate_knowledge_with_backoff(req, max_attempts=5):
 def reset_database_and_sequences():
     with app.app_context():
         print("--- RESETTING LABSERVICES & KNOWLEDGE VECTORS TABLES ---", flush=True)
-        db.session.execute(text("TRUNCATE TABLE bundle_services CASCADE;"))
-        db.session.execute(text("TRUNCATE TABLE labservices RESTART IDENTITY CASCADE;"))
-        db.session.commit()
+        db.create_all()
+        try:
+            db.session.execute(text("TRUNCATE TABLE bundle_services CASCADE;"))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Notice on bundle_services truncate: {e}", flush=True)
+
+        try:
+            db.session.execute(text("TRUNCATE TABLE labservices RESTART IDENTITY CASCADE;"))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Notice on labservices truncate: {e}", flush=True)
 
         try:
             ensure_vector_table()
