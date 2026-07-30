@@ -92,6 +92,16 @@ def reset_database_and_sequences():
         print("--- RESETTING LABSERVICES & KNOWLEDGE VECTORS TABLES ---", flush=True)
         db.create_all()
         try:
+            db.session.execute(text("ALTER TABLE labservices ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT now();"))
+            db.session.execute(text("ALTER TABLE labservices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT now();"))
+            db.session.execute(text("ALTER TABLE bundles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT now();"))
+            db.session.execute(text("ALTER TABLE bundles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT now();"))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Notice on column migration: {e}", flush=True)
+
+        try:
             db.session.execute(text("TRUNCATE TABLE bundle_services CASCADE;"))
             db.session.commit()
         except Exception as e:
