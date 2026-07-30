@@ -63,9 +63,6 @@ webhook_executor = ThreadPoolExecutor(
 )
 # ── Extensions ────────────────────────────────────────────────────────────────
 
-db.init_app(app)
-migrate = Migrate(app, db)
-
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'يجب تسجيل الدخول أولاً'
