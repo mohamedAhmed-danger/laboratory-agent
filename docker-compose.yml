@@ -22,7 +22,7 @@ services:
     container_name: ikhtiar-labs-agent
     restart: always
     ports:
-      - "4500:4500"
+      - "6789:4500"
     volumes:
       - ./instance:/app/instance
       - ./static/uploads:/app/static/uploads
