@@ -1,11 +1,89 @@
 services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ikhtiar-labs-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Mo162534}
+      POSTGRES_DB: ${POSTGRES_DB:-laboratory_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
   web:
     build: .
-    container_name: laboratory-agent
-    ports:
-      - "127.0.0.1:4500:4500"
+    container_name: ikhtiar-labs-agent
+    restart: always
     volumes:
       - ./instance:/app/instance
+      - ./static/uploads:/app/static/uploads
     env_file:
       - .env
+    environment:
+      - SQLALCHEMY_DATABASE_URI=${SQLALCHEMY_DATABASE_URI}
+    depends_on:
+      db:
+        condition: service_healthy
+      waha:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4500/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:alpine
+    container_name: ikhtiar-labs-nginx
     restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - web
+    networks:
+      - internal
+
+  waha:
+    image: devlikeapro/waha
+    container_name: waha_container
+    restart: always
+    shm_size: '2gb'
+    ports:
+      - "3004:3000"
+    environment:
+      - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USERNAME}
+      - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASSWORD}
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WH_URL=http://web:4500/webhook/waha
+      - WH_EVENTS=message.upsert,message.any
+      - WAHA_SESSION_STORE=FILE
+      - WAHA_SESSIONS_DIR=/app/.sessions
+      - WHATSAPP_DEFAULT_ENGINE=WEBJS
+      - PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu,--no-zygote,--disable-extensions
+      - WAHA_SESSION_CONFIG_IGNORE_STATUS=true
+      - WAHA_SESSION_CONFIG_IGNORE_BROADCAST=true
+    volumes:
+      - ./waha_sessions:/app/.sessions
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgdata:

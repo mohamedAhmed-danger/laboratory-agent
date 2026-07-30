@@ -18,3 +18,6 @@ inspect_pdf.py
 inspect_text_lines.py
 parse_and_insert.py
 test_table_extract.py
+.git
+instance/
+waha_sessions/

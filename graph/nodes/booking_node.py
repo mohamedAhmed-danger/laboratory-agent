@@ -3,10 +3,9 @@ from datetime import datetime
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from graph.nodes.booking_tools import save_booking_tool
-from graph.prompt_service.lab_data import LabDataService
 from graph.schemas.booking_schema import BookingResponse
 from graph.state import AgentState
-from graph.utils import detect_language_fallback, generate_booking_pdf
+from graph.utils import detect_language_fallback, generate_booking_ticket
 from llm.model import get_gemini
 from software_services.client_services import ClientService
 
@@ -31,7 +30,13 @@ RULES
 1. Never ask for fields already collected.
 2. Ask for ONE missing field at a time.
 3. Match the user's language.
-4. Never invent information.
+4. NEVER invent a price, specimen, or duration. If "Matched Service" data is provided below and contains
+   the answer (price/specimen/duration), you MUST state that exact value directly and immediately when
+   asked - do NOT say "I'll confirm it" or defer it. Saying you'll "check and confirm" a price you
+   already have in front of you is unhelpful and unprofessional. Only say you'll confirm/clarify if the
+   Matched Service section is genuinely empty or doesn't contain that specific piece of information.
+   You can still ask for the next missing booking field (name/phone/date) in the SAME reply, right after
+   answering the price question.
 5. Ask the user for confirmation after collecting all fields and before saving.
 6. confirmed=true ONLY if the user clearly confirms.
 7. ready_to_save=true ONLY if ALL fields exist.
@@ -44,12 +49,16 @@ def booking_node(state: AgentState) -> dict:
     platform_id      = state.get("platform_id")
     user_message     = state["user_message"]
     current_summary  = state.get("summary") or ""
-    existing_lead    = state.get("booking_lead") or {}
     last_bot_message = state.get("last_bot_message") or ""
+    matched_context = state.get("rag_context", "")
+   
 
     now = datetime.now()
     current_time_info = now.strftime("Today is %A, %B %d, %Y. Current time is %I:%M %p")
-    lab_info, services = LabDataService.get_all_lab_data(page_id)
+
+   
+    matched_context = state.get("rag_context") or ""
+    
 
     llm            = get_gemini()
     structured_llm = llm.with_structured_output(BookingResponse, include_raw=True)
@@ -64,25 +73,14 @@ CRITICAL: CURRENT TEMPORAL CONTEXT
 Use this to resolve relative dates like "بكرا", "السبت الجاي", etc.
 
 ====================
-LABORATORY & SERVICES DATA
+VERIFIED LAB INFORMATION (Retrieved from Knowledge Base)
 ====================
-Laboratory Info: {lab_info}
-Available Services: {services} 
-
-The available services contain all laboratory analyses with:
-- Analysis Name
-- Required Specimen (sample type)
-- Result Duration (expected turnaround time in days; 0 = same day)
-- Original Price
-
-Use this data to answer questions about analysis availability, prices, required specimens, and result duration. Never invent analyses or prices.
-
+{matched_context or "(No matching laboratory test found. Do not invent prices or medical information.)"}
 
 ====================
 ALREADY COLLECTED
 ====================
 Summary:          {current_summary}
-Lead:             {existing_lead}
 Last bot message: {last_bot_message}
 """
 
@@ -104,14 +102,13 @@ Last bot message: {last_bot_message}
             default="Sorry, a temporary error occurred. Please try again.",
         )
         return {
-            "response":         fallback,
-            "summary":          current_summary,
-            "booking_lead":     existing_lead,
-            "last_bot_message": fallback,
-            "booking_saved":    False,
+            "response":          fallback,
+            "summary":           current_summary,
+            "last_bot_message":  fallback,
+            "booking_saved":     False,
             "booking_reference": None,
-            "booking_pdf":      None,
-            "booking_usage":    None,
+            "booking_ticket":    None,
+            "booking_usage":     None,
         }
 
     # ── usage ─────────────────────────────────────────────────────────────────
@@ -126,36 +123,61 @@ Last bot message: {last_bot_message}
         else None
     )
 
-    # ── merge lead ────────────────────────────────────────────────────────────
-    updated_lead = {
-        **existing_lead,
-        **parsed.lead.model_dump(exclude_none=True),
-    }
+    booking_data = parsed.booking.model_dump(exclude_none=True)
+
+  
 
     required_fields    = ["name", "phone", "details", "date"]
-    all_fields_present = all(updated_lead.get(f) for f in required_fields)
+    all_fields_present = all(
+    booking_data.get(f)
+    for f in required_fields
+)
 
     booking_saved     = False
     booking_reference = None
-    booking_pdf       = None
+    booking_ticket    = None
 
     # ── save ──────────────────────────────────────────────────────────────────
     if parsed.ready_to_save and parsed.confirmed and all_fields_present:
         try:
             result = save_booking_tool.invoke(input={
-                **updated_lead,
+                **booking_data,
                 "comes_from": str(platform_id or "unknown"),
             })
 
             if result.success and result.booking:
                 booking_saved     = True
                 booking_reference = result.booking.reference_id
-                booking_pdf       = generate_booking_pdf(
-                    name=updated_lead.get("name"),
-                    phone=updated_lead.get("phone"),
-                    date=updated_lead.get("date"),
-                    details=updated_lead.get("details"),
+
+                total_price = None
+                try:
+                    from models.models import LabService, Bundle
+                    req_details = booking_data.get("details", "")
+                    sum_price = 0.0
+                    found_any = False
+                    parts = [p.strip() for p in req_details.replace("\n", ",").split(",") if p.strip()]
+                    for p in parts:
+                        svc = LabService.query.filter(LabService.name.ilike(f"%{p}%")).first()
+                        if svc and svc.price:
+                            sum_price += svc.price
+                            found_any = True
+                        else:
+                            bdl = Bundle.query.filter(Bundle.name.ilike(f"%{p}%")).first()
+                            if bdl and bdl.price:
+                                sum_price += bdl.price
+                                found_any = True
+                    if found_any and sum_price > 0:
+                        total_price = sum_price
+                except Exception as p_err:
+                    print(f"[Booking Node] total_price calculation error: {p_err}")
+
+                booking_ticket    = generate_booking_ticket(
+                    name=booking_data.get("name"),
+                    phone=booking_data.get("phone"),
+                    date=booking_data.get("date"),
+                    details=booking_data.get("details"),
                     reference_id=booking_reference,
+                    total_price=total_price,
                 )
 
                 clean_reply = detect_language_fallback(
@@ -177,7 +199,7 @@ Last bot message: {last_bot_message}
         except Exception as e:
             print(f"[Booking Node] Tool error: {e}")
             booking_saved  = False
-            booking_pdf    = None
+            booking_ticket = None
             parsed.summary = current_summary   # rollback summary
 
             clean_reply = detect_language_fallback(
@@ -208,10 +230,9 @@ Last bot message: {last_bot_message}
     return {
         "response":          clean_reply,
         "summary":           parsed.summary,
-        "booking_lead":      {} if booking_saved else updated_lead,
         "last_bot_message":  clean_reply,
         "booking_saved":     booking_saved,
         "booking_reference": booking_reference,
-        "booking_pdf":       booking_pdf,
+        "booking_ticket":    booking_ticket,
         "booking_usage":     booking_usage,
     }

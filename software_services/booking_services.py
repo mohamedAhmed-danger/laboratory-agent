@@ -90,6 +90,7 @@ class BookingService:
         except Exception as e:
             db.session.rollback()
             from sqlalchemy.exc import IntegrityError
+            from notified_center.EmailSender import send_production_alert
             if isinstance(e, IntegrityError):
                 # Fallback in the extremely rare case of reference_id collision
                 reference_id = uuid.uuid4().hex[:12].upper()
@@ -109,7 +110,18 @@ class BookingService:
                     return BookingResult(True, booking, "تم إنشاء الحجز بنجاح")
                 except Exception as ex:
                     db.session.rollback()
+                    send_production_alert(
+                        subject="BookingService create_booking IntegrityError Fallback Exception",
+                        body_or_error=ex,
+                        context={"name": name, "phone": phone_number, "comes_from": comes_from}
+                    )
                     return BookingResult(False, None, f"حدث خطأ أثناء إنشاء الحجز: {str(ex)}")
+
+            send_production_alert(
+                subject="BookingService create_booking Exception",
+                body_or_error=e,
+                context={"name": name, "phone": phone_number, "comes_from": comes_from}
+            )
             return BookingResult(False, None, f"حدث خطأ أثناء إنشاء الحجز: {str(e)}")
 
     # ── update ────────────────────────────────────────────────────────────────
@@ -134,6 +146,12 @@ class BookingService:
             return BookingResult(True, booking, "تم تحديث الحجز بنجاح")
         except Exception as e:
             db.session.rollback()
+            from notified_center.EmailSender import send_production_alert
+            send_production_alert(
+                subject="BookingService update_booking Exception",
+                body_or_error=e,
+                context={"booking_id": booking_id}
+            )
             return BookingResult(False, None, f"حدث خطأ أثناء تحديث الحجز: {str(e)}")
 
     # ── status ────────────────────────────────────────────────────────────────
@@ -152,6 +170,12 @@ class BookingService:
             return BookingResult(False, None, "حالة غير صحيحة")
         except Exception as e:
             db.session.rollback()
+            from notified_center.EmailSender import send_production_alert
+            send_production_alert(
+                subject="BookingService update_status Exception",
+                body_or_error=e,
+                context={"booking_id": booking_id, "new_status": new_status}
+            )
             return BookingResult(False, None, f"حدث خطأ: {str(e)}")
 
     # ── delete ────────────────────────────────────────────────────────────────
@@ -168,6 +192,12 @@ class BookingService:
             return BookingResult(True, booking, "تم حذف الحجز بنجاح")
         except Exception as e:
             db.session.rollback()
+            from notified_center.EmailSender import send_production_alert
+            send_production_alert(
+                subject="BookingService delete_booking Exception",
+                body_or_error=e,
+                context={"booking_id": booking_id}
+            )
             return BookingResult(False, None, f"حدث خطأ أثناء الحذف: {str(e)}")
 
     # ── stats (for dashboard) ─────────────────────────────────────────────────

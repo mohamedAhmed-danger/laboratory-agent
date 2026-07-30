@@ -138,17 +138,17 @@ button, input, select, textarea {
 }
 
 .sidebar-header {
-  padding: 24px 20px 18px;
+  padding: 24px 20px 20px;
   border-bottom: 1px solid var(--sb-border);
 }
 
 .brand-badge {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
 }
 
-.brand-icon {
+.brand-icon { 
   width: 38px;
   height: 38px;
   background: var(--sb-accent-bg);
@@ -157,6 +157,26 @@ button, input, select, textarea {
   border-radius: var(--radius-md);
   padding: 8px;
   flex-shrink: 0;
+}
+
+/* Real logo badge (replaces the flask-conical placeholder icon).
+   The logo artwork is already a self-contained circular badge, so this
+   wrapper stays transparent/unclipped and just sizes + lifts it a bit. */
+.brand-logo {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
 }
 
 .sidebar-header .lab-name {
@@ -421,6 +441,18 @@ button, input, select, textarea {
   height: 250px;
   background: radial-gradient(circle, rgba(129, 140, 248, 0.25) 0%, transparent 70%);
   border-radius: 50%;
+}
+
+.dashboard-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -70px;
+  right: 10%;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 .hero-welcome {

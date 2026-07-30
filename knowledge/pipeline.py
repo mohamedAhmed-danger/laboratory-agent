@@ -1,18 +1,5 @@
-"""
-pipeline.py
-Main orchestrator. Coordinates knowledge generation for an EXISTING
-Lab/Bundle (duplicate checking happens earlier, at creation time -
-see lab_service_services.py / bundle_services.py - not here, since by
-the time this runs the entity already exists and would always match
-itself).
-
-    Generate Knowledge (LLM) -> Validate -> Review Page
-    -> [Admin Approval] -> Update PostgreSQL -> Generate Embedding
-    -> Insert into Vector Database -> Done
-"""
 
 import logging
-
 from .generator import generate_knowledge, regenerate_knowledge
 from .embedding import generate_embedding
 from .schemas import (
@@ -23,35 +10,30 @@ from .schemas import (
     VectorMetadata,
 )
 from .updater import update_knowledge
-from .validator import validate_knowledge
+from .normalizer import normalize_knowledge
 from .vector_store import upsert_vector
 
 logger = logging.getLogger(__name__)
 
 
-class KnowledgeValidationError(Exception):
-    def __init__(self, errors: list[str]):
-        self.errors = errors
-        super().__init__(f"Validation failed: {errors}")
 
+def run_pre_approval_stage(
+    request: KnowledgeGenerationRequest,
+) -> GeneratedKnowledge:
+    """
+    Generate knowledge from the LLM then normalize it before
+    sending it to the Review Page.
+    """
 
-def run_pre_approval_stage(request: KnowledgeGenerationRequest) -> GeneratedKnowledge:
-    """
-    Runs: Generate Knowledge (LLM) -> Validate.
-    Returns the validated GeneratedKnowledge to be shown on the Review Page.
-    Raises KnowledgeValidationError if validation fails.
-    """
-    # Step 1 - Generate Knowledge (LLM)
+    # Step 1 - LLM
     generated = generate_knowledge(request)
 
-    # Step 2 - Validate
-    validation = validate_knowledge(generated)
-    if not validation.is_valid:
-        logger.warning("Validation failed for '%s': %s", request.name, validation.errors)
-        raise KnowledgeValidationError(validation.errors)
+    # Step 2 - Normalize
+    generated = normalize_knowledge(generated)
 
-    # Step 3 happens client-side (Review Page) - nothing written yet.
+    # Step 3 - Review Page
     return generated
+  
 
 
 def regenerate(
@@ -59,13 +41,17 @@ def regenerate(
     previous_output: GeneratedKnowledge,
     admin_feedback: str | None = None,
 ) -> GeneratedKnowledge:
-    """Handles the 'Generate Again' button on the Review Page."""
-    generated = regenerate_knowledge(request, previous_output, admin_feedback)
-    validation = validate_knowledge(generated)
-    if not validation.is_valid:
-        raise KnowledgeValidationError(validation.errors)
-    return generated
+ 
 
+    generated = regenerate_knowledge(
+        request=request,
+        previous_output=previous_output,
+        admin_feedback=admin_feedback,
+    )
+
+    generated = normalize_knowledge(generated)
+
+    return generated
 
 def run_post_approval_stage(entity_id: int, entity_type: EntityType, name: str,
                              final_knowledge: GeneratedKnowledge) -> None:

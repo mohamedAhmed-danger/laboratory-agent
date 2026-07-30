@@ -223,6 +223,13 @@ def analyze_prescription(image_path: str) -> dict:
     overall_confidence = int(data.get("overall_confidence", 0))
     data["process_success"] = overall_confidence >= CONFIDENCE_THRESHOLD
 
+    if usage:
+        data["ocr_usage"] = {
+            "input_tokens": getattr(usage, "prompt_token_count", 0) or 0,
+            "output_tokens": getattr(usage, "candidates_token_count", 0) or 0,
+            "total_tokens": getattr(usage, "total_token_count", 0) or 0
+        }
+
     return data
 
 

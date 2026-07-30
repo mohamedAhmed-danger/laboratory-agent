@@ -49,6 +49,11 @@ class LabServiceService:
         except (TypeError, ValueError):
             return None, "السعر غير صحيح"
 
+        clean_name = name.strip()
+        existing = LabService.query.filter(LabService.name.ilike(clean_name)).first()
+        if existing:
+            return existing, "التحليل موجود بالفعل"
+
         if laboratory_id is None:
             try:
                 laboratory_id = LaboratoryService.get_current_laboratory_id()

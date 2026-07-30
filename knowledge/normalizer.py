@@ -1,0 +1,29 @@
+
+
+from .schemas import GeneratedKnowledge
+
+
+def normalize_knowledge(data: GeneratedKnowledge) -> GeneratedKnowledge:
+
+
+    data.aliases = sorted(
+        {
+            x.strip()
+            for x in data.aliases
+            if x and x.strip()
+        }
+    )
+
+    data.keywords = sorted(
+        {
+            x.strip()
+            for x in data.keywords
+            if x and x.strip()
+        }
+    )
+
+    data.description = data.description.strip()
+
+    data.construct_search_text(data.item_name)
+
+    return data

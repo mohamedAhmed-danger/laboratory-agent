@@ -40,7 +40,57 @@ class FacebookHandler(BaseHandler):
         }
         return self._post_json(f"{self.base_url}/me/messages", payload)
 
-    # ── file (PDF ticket) ─────────────────────────────────────────────────────
+    # ── image (booking ticket, or any photo) ────────────────────────────────
+
+    def send_image(
+        self,
+        recipient_id: str,
+        file_bytes: bytes,
+        filename: str = "ticket.png",
+        mime_type: str = "image/png",
+    ):
+        """
+        Send a photo as an inline image bubble (attachment type "image"),
+        so it previews directly in Messenger instead of showing up as a
+        generic downloadable file. Use this for the booking ticket now
+        that it's rendered as a PNG instead of a PDF.
+        """
+        logger.debug("[FB SEND IMAGE] to=%s file=%s", recipient_id, filename)
+
+        recipient_json = json.dumps({"id": recipient_id})
+        message_json   = json.dumps({
+            "attachment": {
+                "type": "image",
+                "payload": {"is_reusable": False},
+            }
+        })
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/me/messages",
+                params=self.params,
+                data={
+                    "messaging_type": "RESPONSE",
+                    "recipient":      recipient_json,
+                    "message":        message_json,
+                },
+                files={
+                    "filedata": (filename, io.BytesIO(file_bytes), mime_type),
+                },
+                timeout=30,
+            )
+            if response.status_code not in [200, 201]:
+                logger.error(
+                    "[FB IMAGE ERROR] status=%s body=%s",
+                    response.status_code, response.text,
+                )
+            return response
+        except Exception as e:
+            logger.error("[FB IMAGE ERROR] %s", e)
+            return None
+
+    # ── file (generic document attachment — kept for anything that should
+    #          still download rather than preview, e.g. non-image reports) ──
 
     def send_file(
         self,

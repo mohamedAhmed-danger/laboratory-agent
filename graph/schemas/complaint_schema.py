@@ -1,13 +1,34 @@
 from typing import Optional
 from pydantic import BaseModel, Field
 
-class ComplaintLead(BaseModel):
-    phone: Optional[str] = Field(None, description="The user's phone number.")
-    complaint_text: Optional[str] = Field(None, description="Detailed explanation of the user's issue, feedback, or complaint.")
+
+class ComplaintData(BaseModel):
+    phone: Optional[str] = Field(
+        None,
+        description="User phone number."
+    )
+
+    complaint_text: Optional[str] = Field(
+        None,
+        description="Detailed complaint."
+    )
+
 
 class ComplaintResponse(BaseModel):
-    reply: str = Field(description="Clean reply to send to the user")
-    summary: str = Field(description="An updated English summary of the conversation, including the user's complaint and the reply. This summary is for internal use only.")
-    lead: ComplaintLead = Field(description="Structured complaint data ONLY.")
-    confirmed: bool = Field(description="True if the user confirms sending the complaint.")
-    ready_to_save: bool = Field(description="True only if both phone and complaint_text are present.")
+    reply: str = Field(description="Reply to the user.")
+
+    summary: str = Field(
+        description="Updated English conversation summary."
+    )
+
+    complaint: ComplaintData = Field(
+        description="Structured complaint information."
+    )
+
+    confirmed: bool = Field(
+        description="True if enough information exists to submit."
+    )
+
+    ready_to_save: bool = Field(
+        description="True only if phone and complaint_text exist."
+    )

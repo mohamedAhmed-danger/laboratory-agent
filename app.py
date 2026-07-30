@@ -1,3 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
+from venv import logger
+
+from dotenv import load_dotenv
+from griffe import logger
+load_dotenv()
+
+
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_migrate import Migrate
@@ -19,28 +27,40 @@ from software_services.platform_services import PlatformService
 from software_services.page_services import PageService
 
 from platforms.facebook_handler import FacebookHandler
+from platforms.waha_handler import WahaHandler
 from parsers.facebook import parse_facebook_message, parse_facebook_comment
+from knowledge.vector_store import ensure_vector_table
+
+ensure_vector_table()
 
 
 # Load environment variables
 load_dotenv()
 
 # ── App & Config ──────────────────────────────────────────────────────────────
-
 app = Flask(__name__)
 
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
-    secret_key = 'dev-secret-key-change-in-production'
+    raise RuntimeError("SECRET_KEY must be set in environment — no default allowed in production")
 
 db_uri = os.environ.get('SQLALCHEMY_DATABASE_URI')
 if not db_uri:
-    db_uri = 'postgresql://postgres:Mo162534@localhost:5432/laboratory_db'
+    raise RuntimeError("SQLALCHEMY_DATABASE_URI must be set in environment")
 
 app.config['SECRET_KEY'] = secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+db.init_app(app)
+migrate = Migrate(app, db)
+
+# ── Thread pool للـ webhooks بدل الـ threading.Thread المفتوحة ──────────────
+WEBHOOK_MAX_WORKERS = int(os.environ.get("WEBHOOK_MAX_WORKERS", "8"))
+webhook_executor = ThreadPoolExecutor(
+    max_workers=WEBHOOK_MAX_WORKERS,
+    thread_name_prefix="webhook_worker",
+)
 # ── Extensions ────────────────────────────────────────────────────────────────
 
 db.init_app(app)
@@ -540,8 +560,9 @@ def approve_lab_knowledge(lab_id):
             )
             run_post_approval_stage(lab.id, EntityType.LAB, lab.name, gen_obj)
         except Exception as pipe_err:
-            pass
-
+          import traceback
+          print("=== VECTOR STORE UPDATE FAILED ===")
+          traceback.print_exc()
         return jsonify({"success": True, "message": "تم اعتماد حفظ المعرفة واعتمدت بنجاح في قاعدة البيانات وتحديث الفهرس الدلالي!"})
     except Exception as e:
         db.session.rollback()
@@ -1105,7 +1126,6 @@ def edit_platform(platform_id):
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN") or os.environ.get("FB_VERIFY_TOKEN")
 
 
-# receives Facebook messages/comments, verifies webhook subscription on GET
 @app.route("/webhook/facebook", methods=["GET", "POST"])
 def fb_webhook():
     if request.method == "GET":
@@ -1119,7 +1139,7 @@ def fb_webhook():
     except Exception:
         return "OK", 200
 
-    def process():
+    def process(entries):
         with app.app_context():
             try:
                 for entry in entries:
@@ -1133,7 +1153,6 @@ def fb_webhook():
 
                     handler = FacebookHandler(page)
 
-                    # ── regular messages ──────────────────────────────────
                     for messaging in entry.get("messaging", []):
                         message = parse_facebook_message(
                             messaging=messaging,
@@ -1146,44 +1165,119 @@ def fb_webhook():
                             continue
 
                         handler.send_typing(message.sender_id)
-                        reply, pdf_bytes = handler.handle(message)
+                        reply, ticket_bytes = handler.handle(message)
+
+                        logger.info(
+                            "[FB] sender=%s has_reply=%s has_ticket=%s",
+                            message.sender_id, bool(reply), bool(ticket_bytes),
+                        )
 
                         if reply:
                             handler.send(message.sender_id, reply)
 
-                        if pdf_bytes:
-                            handler.send_file(
+                        if ticket_bytes:
+                            handler.send_image(
                                 recipient_id=message.sender_id,
-                                file_bytes=pdf_bytes,
-                                filename="booking_ticket.pdf",
+                                file_bytes=ticket_bytes,
+                                filename="booking_ticket.png",
                             )
 
-                    # ── comments ──────────────────────────────────────────
                     for change in entry.get("changes", []):
-                        print(f"[DEBUG CHANGE VALUE] {change.get('value', {})}")
                         comment_id = parse_facebook_comment(change)
-
                         if not comment_id:
                             continue
-                        print(f"[DEBUG COMMENT] comment_id={comment_id}")
+                        logger.debug("[FB] comment_id=%s", comment_id)
                         handler.handle_comment(comment_id)
 
-            except Exception:
-                import traceback
-                print("WEBHOOK THREAD ERROR:")
-                print(traceback.format_exc())
+            except Exception as e:
+                db.session.rollback()
+                logger.exception("FB webhook processing error")
+                from notified_center.EmailSender import send_production_alert
+                send_production_alert(
+                    subject="Facebook Webhook Worker Failure",
+                    body_or_error=e,
+                    context={"entries_count": len(entries) if entries else 0}
+                )
             finally:
                 db.session.remove()
 
-    threading.Thread(target=process, daemon=True).start()
+    webhook_executor.submit(process, entries)
     return "OK", 200
 
 
+
+@app.route("/webhook/waha", methods=["POST"])
+def waha_webhook():
+    try:
+        data = request.json or {}
+    except Exception:
+        return "OK", 200
+
+    payload = data.get("payload", {})
+    session_name = data.get("session")
+
+    def process(payload, session_name):
+        with app.app_context():
+            try:
+                page = Page.query.filter_by(waha_session=session_name).first()
+                if not page:
+                    return
+
+                handler = WahaHandler(page)
+
+                message = handler.parse_message(payload, page.page_id)
+                if not message:
+                    return
+
+                handler.send_typing(message.sender_id)
+                reply, ticket_bytes = handler.handle(message)
+
+                logger.info(
+                    "[WAHA] sender=%s has_reply=%s has_ticket=%s",
+                    message.sender_id, bool(reply), bool(ticket_bytes),
+                )
+
+                if reply:
+                    handler.send(message.sender_id, reply)
+
+                if ticket_bytes:
+                    handler.send_image(
+                        recipient_id=message.sender_id,
+                        file_bytes=ticket_bytes,
+                        filename="booking_ticket.png",
+                    )
+
+            except Exception as e:
+                db.session.rollback()
+                logger.exception("WAHA webhook processing error")
+                from notified_center.EmailSender import send_production_alert
+                send_production_alert(
+                    subject="WAHA Webhook Worker Failure",
+                    body_or_error=e,
+                    context={"session_name": session_name}
+                )
+            finally:
+                db.session.remove()
+
+    webhook_executor.submit(process, payload, session_name)
+    return "OK", 200
 # ══════════════════════════════════════════════════════════════════════════
 # Run
 # ══════════════════════════════════════════════════════════════════════════
 
+# ══════════════════════════════════════════════════════════════════════════
+# Health check
+# ══════════════════════════════════════════════════════════════════════════
+
+@app.route('/health')
+def health():
+    try:
+        db.session.execute(db.text("SELECT 1"))
+        return jsonify(status="ok"), 200
+    except Exception as e:
+        logger.error("Health check DB failure: %s", e)
+        return jsonify(status="error", detail="db_unreachable"), 503
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
+
     app.run(debug=False)

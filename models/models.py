@@ -153,7 +153,7 @@ class Page(db.Model):
     laboratory_id = db.Column(db.Integer, db.ForeignKey('laboratory.id'), nullable=False)
     platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False)
     page_id = db.Column(db.String(100), nullable=False)
-    token = db.Column(db.String(200), nullable=False)
+    token = db.Column(db.Text, nullable=False)
 
     clients = db.relationship('Client', backref='page', lazy=True)
 

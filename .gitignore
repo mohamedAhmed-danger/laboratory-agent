@@ -3,3 +3,9 @@ myenv
 instance
 *.pyc
 __pycache__/**
+__pycache__/
+*.pyc
+instance/
+.env
+venv/
+waha_sessions/

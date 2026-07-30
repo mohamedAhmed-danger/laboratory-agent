@@ -26,7 +26,7 @@ def build_embedding_text(name: str, approved: ApprovedKnowledge) -> str:
 
 
 def generate_embedding(name: str, approved: ApprovedKnowledge) -> list[float]:
-    """Calls Gemini to embed the combined knowledge search_text. Returns a vector."""
+    
     client_or_genai = get_gemini_client()
     text_input = build_embedding_text(name, approved)
 
@@ -34,6 +34,7 @@ def generate_embedding(name: str, approved: ApprovedKnowledge) -> list[float]:
         res = client_or_genai.models.embed_content(
             model=EMBEDDING_MODEL,
             contents=text_input,
+            config={"output_dimensionality": EMBEDDING_DIM}
         )
         embedding = res.embeddings[0].values
     else:

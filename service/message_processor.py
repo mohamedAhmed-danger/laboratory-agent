@@ -19,38 +19,52 @@ class IncomingMessage:
         self.media         = media
 
 
-def _calc_total_usage(result: dict) -> dict:
+INPUT_COST_PER_TOKEN = 0.075 / 1_000_000
+OUTPUT_COST_PER_TOKEN = 0.300 / 1_000_000
+
+
+def _calc_total_usage(result: dict, ocr_usage: dict = None) -> dict:
     nodes = [
-        "intent_usage",
-        "lab_info_usage",
-        "booking_usage",
-        "complaint_usage",
-        "direct_usage",
-        "inquiry_usage",
+        ("ocr_vision_usage", ocr_usage),
+        ("intent_usage", result.get("intent_usage")),
+        ("lab_info_usage", result.get("lab_info_usage")),
+        ("booking_usage", result.get("booking_usage")),
+        ("complaint_usage", result.get("complaint_usage")),
+        ("direct_usage", result.get("direct_usage")),
+        ("inquiry_usage", result.get("inquiry_usage")),
     ]
     total_in = total_out = total = 0
     breakdown = {}
 
-    for key in nodes:
-        u = result.get(key) or {}
+    for key, u in nodes:
+        if not u:
+            continue
         i = u.get("input_tokens",  0) or 0
         o = u.get("output_tokens", 0) or 0
-        t = u.get("total_tokens",  0) or 0
+        t = u.get("total_tokens",  0) or (i + o)
         if i or o:
-            breakdown[key] = {"input": i, "output": o, "total": t or i + o}
+            node_cost = (i * INPUT_COST_PER_TOKEN) + (o * OUTPUT_COST_PER_TOKEN)
+            breakdown[key] = {"input": i, "output": o, "total": t, "cost_usd": node_cost}
             total_in  += i
             total_out += o
-            total     += t or i + o
+            total     += t
+
+    total_cost_usd = (total_in * INPUT_COST_PER_TOKEN) + (total_out * OUTPUT_COST_PER_TOKEN)
+    total_cost_cents = total_cost_usd * 100
+    req_per_dollar = int(1.0 / total_cost_usd) if total_cost_usd > 0 else 0
 
     return {
-        "breakdown":    breakdown,
-        "total_input":  total_in,
-        "total_output": total_out,
-        "total_tokens": total,
+        "breakdown":        breakdown,
+        "total_input":      total_in,
+        "total_output":     total_out,
+        "total_tokens":     total,
+        "total_cost_usd":   total_cost_usd,
+        "total_cost_cents": total_cost_cents,
+        "req_per_dollar":   req_per_dollar,
     }
 
 
-def run_agent(message: IncomingMessage) -> tuple[str, bytes | None]:
+def run_agent(message: IncomingMessage, ocr_usage: dict = None) -> tuple[str, bytes | None]:
     client = ClientService.get_or_create_client(
         message.sender_id, message.page_id, message.platform_id
     )
@@ -83,21 +97,34 @@ def run_agent(message: IncomingMessage) -> tuple[str, bytes | None]:
         response_obj = AgentResponse.from_result(result)
     except Exception as e:
         print(f"[run_agent] Error: {e}")
+        from notified_center.EmailSender import send_production_alert
+        send_production_alert(
+            subject="Agent Graph Execution Failure in message_processor",
+            body_or_error=e,
+            context={"sender_id": message.sender_id, "page_id": message.page_id, "platform_id": message.platform_id}
+        )
         return "Sorry, something went wrong. Please try again in a moment.", None
 
-    usage = _calc_total_usage(result)
-    print(
-        f"\n📊 TOTAL USAGE"
-        f" | intent={result.get('intent')}"
-        f" | in={usage['total_input']}"
-        f" | out={usage['total_output']}"
-        f" | total={usage['total_tokens']}"
-    )
+    usage = _calc_total_usage(result, ocr_usage=ocr_usage)
+    print("\n" + "=" * 76)
+    print(" ⚡ REAL-TIME REQUEST METRICS & COST ANALYSIS")
+    print(f" 👤 Sender ID: {message.sender_id} | Platform: {platform_name} | Intent: {result.get('intent')}")
+    print("-" * 76)
+    print(" 🔹 Node Breakdown:")
     for node, u in usage["breakdown"].items():
-        print(f"   └─ {node:<22} in={u['input']:>5} | out={u['output']:>5} | total={u['total']:>6}")
+        print(f"    └─ {node:<22} in={u['input']:>5} | out={u['output']:>5} | total={u['total']:>6} | cost=${u['cost_usd']:.8f}")
+    print("-" * 76)
+    print(" 📊 TOTAL REAL REQUEST METRICS:")
+    print(f"    - Input Tokens  : {usage['total_input']:,}")
+    print(f"    - Output Tokens : {usage['total_output']:,}")
+    print(f"    - Total Tokens  : {usage['total_tokens']:,}")
+    print(f"    - Real Cost     : ${usage['total_cost_usd']:.8f} USD ({usage['total_cost_cents']:.5f}¢ cents)")
+    if usage['req_per_dollar'] > 0:
+        print(f"    - Capacity      : ~{usage['req_per_dollar']:,} such real requests per $1.00 USD")
+    print("=" * 76 + "\n", flush=True)
 
     # Return reply text and any booking PDF generated
-    return response_obj.response, result.get("booking_pdf")
+    return response_obj.response, result.get("booking_ticket")
 
 
 def handle_image_message(message: IncomingMessage, page) -> tuple[str, bytes | None]:
@@ -131,13 +158,13 @@ def handle_image_message(message: IncomingMessage, page) -> tuple[str, bytes | N
                 laboratory_id=page.laboratory_id
             )
 
+            ocr_usage = ocr_result.get("ocr_usage")
 
             if ocr_result.get("success"):
                 # High confidence prescription -> Send extracted text to LangGraph Agent
                 extracted_text = ocr_result.get("extracted_text", "")
                 message.text = f"[Prescription OCR Extracted Text]:\n{extracted_text}"
-                message.type = "text"
-                return run_agent(message)
+                return run_agent(message, ocr_usage=ocr_usage)
             else:
                 # Low confidence prescription or spam
                 if ocr_result.get("classified_as") == "prescription":
@@ -160,4 +187,10 @@ def handle_image_message(message: IncomingMessage, page) -> tuple[str, bytes | N
             return "عذرًا، فشل تحميل الصورة المرفقة. يرجى المحاولة مرة أخرى.", None
     except Exception as e:
         print(f"[handle_image_message] Error: {e}")
+        from notified_center.EmailSender import send_production_alert
+        send_production_alert(
+            subject="Image Processing Failure in message_processor",
+            body_or_error=e,
+            context={"sender_id": message.sender_id, "page_id": message.page_id, "platform_id": message.platform_id}
+        )
         return "عذرًا، حدث خطأ أثناء معالجة الصورة المرفقة. يرجى المحاولة مرة أخرى.", None

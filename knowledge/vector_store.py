@@ -9,6 +9,25 @@ from .utils import vector_session
 logger = logging.getLogger(__name__)
 
 
+def ensure_vector_table() -> None:
+    """Ensures vector extension and knowledge_vectors table exist in PostgreSQL."""
+    try:
+        with vector_session() as session:
+            session.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            session.execute(text("""
+                CREATE TABLE IF NOT EXISTS knowledge_vectors (
+                    id INT NOT NULL,
+                    type VARCHAR(50) NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    embedding vector(768),
+                    updated_at TIMESTAMP DEFAULT NOW(),
+                    PRIMARY KEY (id, type)
+                );
+            """))
+    except Exception as e:
+        logger.warning("Failed to initialize vector table: %s", e)
+
+
 def _to_pgvector_literal(embedding: list[float]) -> str:
     """pgvector expects a string like '[0.1,0.2,0.3]'."""
     return "[" + ",".join(str(x) for x in embedding) + "]"

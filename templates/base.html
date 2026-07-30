@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}المختبر — لوحة التحكم{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/logo (2).png') }}" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
@@ -25,9 +26,11 @@
 
   <div class="sidebar-header">
     <div class="brand-badge">
-      <i data-lucide="flask-conical" class="brand-icon"></i>
+      <div class="brand-logo">
+        <img src="{{ url_for('static', filename='images/logo (2).png') }}" alt="معامل الاختيار">
+      </div>
       <div>
-        <div class="lab-name">مختبر الإسكندرية</div>
+        <div class="lab-name">معامل الاختيار</div>
         <div class="lab-sub">نظام الأتمتة الطبي الذكي</div>
       </div>
     </div>
