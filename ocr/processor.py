@@ -1,11 +1,4 @@
 """
-ocr/processor.py
-
-Orchestrates the OCR pipeline using a SINGLE Gemini multimodal call.
-
-Old flow  (2 API calls):
-    classify_prescription()  ->  extract_prescription_data()
-
 New flow  (1 API call):
     analyze_prescription()  ->  route based on process_success flag
 

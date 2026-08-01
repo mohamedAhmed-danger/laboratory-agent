@@ -1,4 +1,6 @@
-from sqlalchemy import text
+from collections import defaultdict
+
+from sqlalchemy import bindparam, text
 
 from knowledge.schemas import EntityType
 from knowledge.utils import main_session
@@ -11,54 +13,69 @@ TABLE_BY_TYPE = {
 }
 
 
-def _fetch_row(result: SearchResult):
+def _fetch_rows(results: list[SearchResult]) -> dict:
 
-    table = TABLE_BY_TYPE[result.type]
+    grouped = defaultdict(list)
 
-    if result.type == EntityType.LAB:
-        query = f"""
-        SELECT
-            name,
-            description,
-            price,
-            specimen,
-            durations,
-            patient_instructions
-        FROM {table}
-        WHERE id=:id
-        """
-    else:
-        query = f"""
-        SELECT
-            name,
-            description,
-            price,
-            patient_instructions
-        FROM {table}
-        WHERE id=:id
-        """
+    for result in results:
+        grouped[result.type].append(result.id)
+
+    rows = {}
 
     with main_session() as session:
-        row = session.execute(
-            text(query),
-            {"id": result.id}
-        ).fetchone()
 
-    if row is None:
-        return None
+        for entity_type, ids in grouped.items():
 
-    return dict(row._mapping)
+            table = TABLE_BY_TYPE[entity_type]
+
+            if entity_type == EntityType.LAB:
+                query = text(f"""
+                    SELECT
+                        id,
+                        name,
+                        description,
+                        price,
+                        specimen,
+                        durations,
+                        patient_instructions
+                    FROM {table}
+                    WHERE id IN :ids
+                """).bindparams(bindparam("ids", expanding=True))
+
+            else:
+                query = text(f"""
+                    SELECT
+                        id,
+                        name,
+                        description,
+                        price,
+                        patient_instructions
+                    FROM {table}
+                    WHERE id IN :ids
+                """).bindparams(bindparam("ids", expanding=True))
+
+            result_rows = session.execute(
+                query,
+                {"ids": ids},
+            ).mappings()
+
+            for row in result_rows:
+                rows[(entity_type, row["id"])] = dict(row)
+
+    return rows
 
 
 def build_context(results: list[SearchResult]) -> str:
+
+    rows = _fetch_rows(results)
 
     sections = []
 
     for result in results:
 
-        row = _fetch_row(result)
+        row = rows.get((result.type, result.id))
 
-        if not row:
+        if row is None:
             continue
 
         block = []
@@ -84,4 +101,4 @@ def build_context(results: list[SearchResult]) -> str:
 
         sections.append("\n".join(block))
 
-    return "\n\n------------------------\n\n".join(sections)
+    return "\n\n" + ("-" * 80 + "\n\n").join(sections)

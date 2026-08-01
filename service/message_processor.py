@@ -72,25 +72,34 @@ def run_agent(message: IncomingMessage, ocr_usage: dict = None) -> tuple[str, by
     platform_name = message.platform_name or str(message.platform_id)
 
     state = {
-        "page_id":           message.page_id,
-        "sender_id":         message.sender_id,
-        "platform_id":       message.platform_id,
-        "platform_name":     platform_name,
-        "user_message":      message.text or "",
-        "summary":           client.summary          or "",
-        "last_bot_message":  client.last_bot_message or "",
-        "intent":            None,
-        "response":          None,
-        "intent_usage":      None,
-        "lab_info_usage":    None,
-        "booking_usage":     None,
-        "complaint_usage":   None,
-        "direct_usage":      None,   
-        "inquiry_usage":     None,
-        "booking_saved":     None,
-        "complaint_saved":   None,
-        "inquiry_saved":     None,
-    }
+       "page_id": message.page_id,
+       "sender_id": message.sender_id,
+       "platform_id": message.platform_id,
+       "platform_name": platform_name,
+        "user_message": message.text or "",
+        "summary": client.summary or "",
+        "last_bot_message": client.last_bot_message or "",
+
+        "intent": None,
+        "refined_queries": [],
+
+        "rag_context": "",
+        "search_results": [],
+        "top_score": 0.0,
+
+        "response": None,
+
+        "intent_usage": None,
+        "lab_info_usage": None,
+        "booking_usage": None,
+        "complaint_usage": None,
+        "direct_usage": None,
+        "inquiry_usage": None,
+
+        "booking_saved": None,
+        "complaint_saved": None,
+        "inquiry_saved": None,
+}
 
     try:
         result       = get_agent_graph().invoke(state)

@@ -1,129 +1,153 @@
 from enum import Enum
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel, Field
+
 
 from graph.state import AgentState
 from llm.model import get_gemini
+from graph.schemas.intent_schema import IntentResponse, IntentType
 
-
-class IntentType(str, Enum):
-    BOOKING = "booking"
-    INQUIRY = "inquiry"
-    COMPLAINT = "complaint"
-    DIRECT = "direct"
-
-
-class IntentResponse(BaseModel):
-
-    intent: IntentType = Field(
-        description="Detected user intent."
-    )
-
-    search_query: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Semantic search terms used for retrieval. "
-            "Include standardized medical names, aliases, abbreviations, "
-            "common spellings and related keywords. "
-            "Return an empty list if no medical entity exists."
-        )
-    )
 
 
 INTENT_SYSTEM_PROMPT = """
 You are responsible ONLY for routing and search query generation.
 
-You are NOT an assistant.
-You are NOT answering the user.
+You NEVER answer the user.
 
-Your job has only two tasks.
+You ONLY return the structured output.
 
----------------------------------------
+====================================================
 TASK 1 : Intent Classification
----------------------------------------
+====================================================
 
-Choose ONE intent.
+Choose exactly ONE intent.
 
 booking
-The user wants to book, schedule or continue booking.
+The user wants to book, continue a booking, confirm a booking,
+or provide booking information.
 
 inquiry
-The user asks about laboratory tests, prices,
-availability, preparation,
-result duration,
-or mentions a laboratory test or medical concern.
+The user asks about laboratory tests, bundles, prices,
+availability, preparation, result duration,
+mentions medical symptoms,
+or asks medical laboratory questions.
 
 complaint
-The user reports a problem or complaint.
+The user reports a complaint, negative experience,
+problem or feedback.
 
 direct
-Greetings,
-small talk,
-thanks,
-lab information,
-working hours,
-location,
+Greetings, thanks, small talk,
+working hours, location,
 phone numbers,
 or anything unrelated to laboratory retrieval.
 
----------------------------------------
-TASK 2 : Search Query Generation
----------------------------------------
+====================================================
+TASK 2 : Refined Search Queries
+====================================================
 
-If the message contains laboratory tests,
-medical abbreviations,
-medical entities,
-or symptoms,
+Extract ONE search object for EVERY laboratory test,
+bundle, medical abbreviation,
+or medical symptom mentioned by the user.
 
-generate a semantic retrieval query.
+Each search object MUST contain:
 
-The search query should contain:
+• query
+The canonical laboratory or bundle name.
 
-- official laboratory name
-- common English name
-- common Arabic name
+• aliases
+Equivalent names that refer to EXACTLY the same laboratory test.
+
+Include when highly confident:
+
+- official names
 - abbreviations
-- aliases
-- common spellings
-- search keywords
+- Arabic names
+- English names
+- common laboratory naming conventions
+- equivalent laboratory names
 
-The purpose is ONLY to improve retrieval quality.
+Examples of valid aliases:
 
-Do NOT answer.
+CBC
+Complete Blood Count
+Complete Blood Picture
+CBP
+صورة دم
+صورة دم كاملة
 
-Do NOT recommend tests.
+Do NOT include:
 
-Do NOT invent laboratory tests.
+- related laboratory tests
+- symptoms
+- diseases
+- misspellings
+- typing mistakes
 
-Do NOT generate medical advice.
+• keywords
 
-Only expand entities that you are highly confident about.
+Medical retrieval keywords related to the laboratory test.
 
-If there are no medical entities,
+Examples:
 
-return an empty list.
+Ferritin
 
----------------------------------------
+keywords:
+iron
+iron deficiency
+iron stores
+anemia
+
+CBC
+
+keywords:
+blood
+hematology
+hemoglobin
+red blood cells
+white blood cells
+platelets
+
+• description
+
+A very short medical description (one sentence maximum)
+used ONLY to improve semantic retrieval.
+
+====================================================
+Rules
+====================================================
+
+- Create one search object per laboratory entity.
+- Do not merge unrelated laboratory tests.
+- Do not invent laboratory tests.
+- Only generate aliases and keywords when highly confident.
+- If no laboratory entity exists, return an empty list.
+- Never answer the user's question.
+- Never recommend tests.
+- Never provide medical advice.
+
+====================================================
 Conversation Continuation
----------------------------------------
+====================================================
 
-If the conversation summary shows the user is
+If the conversation summary indicates the user is
 already inside a booking flow,
-keep the booking intent even if the latest
-message is short like:
 
-"yes"
+keep the intent as booking,
 
-"okay"
+even if the latest message is short, such as:
 
 "تمام"
 
 "اكمل"
 
----------------------------------------
-Output
----------------------------------------
+"ايوة"
+
+"yes"
+
+"confirm"
+
+====================================================
 
 Return ONLY the structured output.
 """
@@ -168,7 +192,7 @@ Conversation Summary:
 
             "intent": IntentType.DIRECT.value,
 
-            "search_query": [],
+            "refined_queries": [],
 
             "intent_usage": None,
         }
@@ -192,7 +216,7 @@ Conversation Summary:
 
         "intent": parsed.intent.value,
 
-        "search_query": parsed.search_query,
+        "refined_queries": parsed.refined_queries,
 
         "intent_usage": intent_usage,
     }

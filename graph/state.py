@@ -1,4 +1,6 @@
 from typing import Any, TypedDict, Optional
+from graph.schemas.intent_schema import RefinedQuery
+
 
 class AgentState(TypedDict):
 
@@ -12,9 +14,9 @@ class AgentState(TypedDict):
     user_message: str
     response: Optional[str]
 
-    # routing
+   # routing
     intent: Optional[str]
-    refined_query: Optional[str]
+    refined_queries: Optional[list[RefinedQuery]]
 
    
     # memory
@@ -39,4 +41,5 @@ class AgentState(TypedDict):
 
 
     rag_context: Optional[str]
-    search_results: Optional[list]
+    search_results: Optional[list[Any]]
+    top_score: Optional[float]
