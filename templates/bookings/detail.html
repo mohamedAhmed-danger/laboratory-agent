@@ -4,7 +4,6 @@
 {% block topbar_sub %}{{ booking.name }} — #{{ booking.reference_id }}{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('edit_booking', booking_id=booking.id) }}" class="btn btn-ghost">تعديل</a>
   <form method="POST" action="{{ url_for('delete_booking', booking_id=booking.id) }}"
         onsubmit="return confirm('هل أنت متأكد؟')">
     <button type="submit" class="btn btn-danger">حذف</button>
