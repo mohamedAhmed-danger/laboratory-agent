@@ -12,6 +12,8 @@ from flask_migrate import Migrate
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 import threading
+import click
+from flask.cli import with_appcontext
 
 from models.models import db, User, Laboratory, Page, LabService, Status
 
@@ -67,6 +69,49 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'يجب تسجيل الدخول أولاً'
 login_manager.login_message_category = 'error'
+
+
+
+
+
+@app.cli.command("create-admin")
+@click.option("--username", prompt=True)
+@click.option("--password", prompt=True, hide_input=True)
+@with_appcontext
+def create_admin(username, password):
+    existing = User.query.filter_by(username=username).first()
+    if existing:
+        print("Admin already exists")
+        return
+    admin = User(username=username, password=password)
+    db.session.add(admin)
+    db.session.commit()
+    print("Admin created successfully")
+
+
+@app.cli.command("delete-admin")
+@click.option("--username", prompt=True)
+@with_appcontext
+def delete_admin(username):
+    admin = User.query.filter_by(username=username).first()
+    if not admin:
+        print("Admin not found")
+        return
+    db.session.delete(admin)
+    db.session.commit()
+    print("Admin deleted successfully")
+
+
+@app.cli.command("list-admins")
+@with_appcontext
+def list_admins():
+    admins = User.query.all()
+    if not admins:
+        print("No admins found")
+        return
+    for a in admins:
+        print(f"ID: {a.id} | Username: {a.username}")
+
 
 
 @login_manager.user_loader

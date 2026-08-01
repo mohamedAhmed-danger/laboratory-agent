@@ -115,14 +115,19 @@
             </form>
           </td>
           <td>
-            <div style="display:flex;gap:.5rem;">
-              <a href="{{ url_for('view_booking', booking_id=booking.id) }}" class="btn btn-ghost btn-sm">عرض</a>
-              <a href="{{ url_for('edit_booking', booking_id=booking.id) }}" class="btn btn-ghost btn-sm">تعديل</a>
-              <form method="POST" action="{{ url_for('delete_booking', booking_id=booking.id) }}"
-                    onsubmit="return confirm('هل أنت متأكد من حذف هذا الحجز؟')">
-                <button type="submit" class="btn btn-danger btn-sm">حذف</button>
-              </form>
-            </div>
+           <div style="display:flex;gap:.5rem;">
+  <a href="{{ url_for('view_booking', booking_id=booking.id) }}" class="btn btn-ghost btn-sm">
+    عرض
+  </a>
+
+  <form method="POST"
+        action="{{ url_for('delete_booking', booking_id=booking.id) }}"
+        onsubmit="return confirm('هل أنت متأكد من حذف هذا الحجز؟')">
+    <button type="submit" class="btn btn-danger btn-sm">
+      حذف
+    </button>
+  </form>
+</div>
           </td>
         </tr>
         {% else %}
