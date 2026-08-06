@@ -48,9 +48,25 @@
 
       <div class="form-group" style="grid-column: span 2;">
         <label class="form-label" style="font-weight:700;margin-bottom:8px;display:block;">اختر التحاليل الطبية المشمولة بالباقة</label>
+
+        <!-- Search box -->
+        <div style="position:relative;margin-bottom:10px;">
+          <input
+            type="text"
+            id="lab-search"
+            class="form-control"
+            placeholder="ابحث عن تحليل بالاسم..."
+            style="padding-right:36px;"
+            autocomplete="off"
+          >
+          <i data-lucide="search" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);"></i>
+        </div>
+
+        <div id="lab-count-info" style="font-size:0.82rem;color:var(--text-muted);margin-bottom:8px;"></div>
+
         <div style="max-height:260px;overflow-y:auto;border:1px solid var(--surface-border);padding:14px;border-radius:var(--radius-md);background:#f8fafc;display:flex;flex-direction:column;gap:10px;">
           {% for lab in labs %}
-          <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#ffffff;border:1px solid var(--surface-border);border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition);" class="lab-item-row">
+          <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#ffffff;border:1px solid var(--surface-border);border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition);" class="lab-item-row" data-lab-name="{{ lab.name|lower }}">
             <input 
               type="checkbox" 
               name="lab_ids" 
@@ -68,6 +84,7 @@
           {% else %}
           <div style="color:var(--text-muted);font-size:0.9rem;text-align:center;padding:20px;">لا توجد تحاليل مسجلة بالنظام بعد. أضف تحاليل أولاً.</div>
           {% endfor %}
+          <div id="no-lab-results" style="display:none;color:var(--text-muted);font-size:0.9rem;text-align:center;padding:20px;">لا توجد نتائج مطابقة للبحث</div>
         </div>
       </div>
 
@@ -103,6 +120,11 @@
 document.addEventListener('DOMContentLoaded', function() {
   const priceInput = document.getElementById('bundle-price');
   const checkboxes = document.querySelectorAll('.lab-checkbox');
+  const searchInput = document.getElementById('lab-search');
+  const labRows = document.querySelectorAll('.lab-item-row');
+  const noResults = document.getElementById('no-lab-results');
+  const countInfo = document.getElementById('lab-count-info');
+  const totalLabs = labRows.length;
 
   function calculateTotal() {
     let total = 0;
@@ -114,9 +136,35 @@ document.addEventListener('DOMContentLoaded', function() {
     priceInput.value = total.toFixed(2);
   }
 
+  function filterLabs() {
+    const query = searchInput.value.trim().toLowerCase();
+    let visibleCount = 0;
+
+    labRows.forEach(row => {
+      const name = row.getAttribute('data-lab-name') || '';
+      const matches = name.includes(query);
+      row.style.display = matches ? 'flex' : 'none';
+      if (matches) visibleCount++;
+    });
+
+    if (noResults) {
+      noResults.style.display = (query && visibleCount === 0) ? 'block' : 'none';
+    }
+
+    if (countInfo) {
+      countInfo.textContent = query
+        ? `عرض ${visibleCount} من ${totalLabs} تحليل`
+        : '';
+    }
+  }
+
   checkboxes.forEach(cb => {
     cb.addEventListener('change', calculateTotal);
   });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', filterLabs);
+  }
 });
 </script>
 

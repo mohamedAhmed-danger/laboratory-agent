@@ -101,4 +101,4 @@ def build_context(results: list[SearchResult]) -> str:
 
         sections.append("\n".join(block))
 
-    return "\n\n" + ("-" * 80 + "\n\n").join(sections)
+    return "\n\n" + ("\n\n").join(sections)

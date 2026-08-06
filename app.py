@@ -15,7 +15,7 @@ import threading
 import click
 from flask.cli import with_appcontext
 
-from models.models import db, User, Laboratory, Page, LabService, Status
+from models.models import db, User, Laboratory, Page, LabService, Status,Platform
 
 from software_services.laboratory_services import LaboratoryService
 from software_services.booking_services import BookingService
@@ -27,6 +27,10 @@ from software_services.lab_service_services import LabServiceService
 from software_services.bundle_services import BundleServiceLogic
 from software_services.platform_services import PlatformService
 from software_services.page_services import PageService
+from software_services.subscription_service import SubscriptionService
+from datetime import datetime, timezone, timedelta
+
+
 
 from platforms.facebook_handler import FacebookHandler
 from platforms.waha_handler import WahaHandler
@@ -173,7 +177,47 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html')
+
+    laboratory = Laboratory.query.first()
+
+    subscription = None
+    subscription_status = None
+    usage_percentage = 0
+    remaining_messages = 0
+    alert = None
+
+    if laboratory:
+
+        subscription = SubscriptionService.get_subscription_by_laboratory_id(
+            laboratory.id
+        )
+
+        if subscription:
+
+            subscription_status = SubscriptionService.get_status(
+                subscription
+            )
+
+            usage_percentage = SubscriptionService.usage_percentage(
+                subscription
+            )
+
+            remaining_messages = SubscriptionService.messages_remaining(
+                subscription
+            )
+
+            alert = SubscriptionService.get_alert(
+                subscription
+            )
+
+    return render_template(
+        "dashboard.html",
+        subscription=subscription,
+        subscription_status=subscription_status,
+        usage_percentage=usage_percentage,
+        remaining_messages=remaining_messages,
+        alert=alert,
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -867,6 +911,7 @@ def confirm_inquiry(inquiry_id):
     if not result.success:
         flash(result.message, 'error')
         return redirect(url_for('list_inquiries'))
+
     inquiry = result.inquiry
 
     selected_service_ids = request.form.getlist('selected_services')
@@ -877,6 +922,7 @@ def confirm_inquiry(inquiry_id):
     selected_services = LabService.query.filter(
         LabService.id.in_([int(sid) for sid in selected_service_ids])
     ).all()
+
     if not selected_services:
         flash('الخدمات المحددة غير صالحة.', 'error')
         return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
@@ -885,7 +931,9 @@ def confirm_inquiry(inquiry_id):
     message_lines = [
         "تمت مراجعة الروشتة الخاصة بك من قبل الطبيب. التحاليل المطلوبة هي:",
     ]
+
     total_price = 0.0
+
     for s in selected_services:
         service_names.append(s.name)
         message_lines.append(f"- {s.name}: {s.price} ج.م")
@@ -893,33 +941,53 @@ def confirm_inquiry(inquiry_id):
 
     message_lines.append(f"إجمالي التكلفة: {total_price} ج.م")
     message_lines.append("لتأكيد حجز موعد الموعد، يرجى كتابة 'تأكيد' أو 'تمام'.")
+
     reply_text = "\n".join(message_lines)
 
     comes_from = inquiry.comes_from or ""
-    if not comes_from.startswith("Facebook:"):
+
+    try:
+        platform, sender_id, page_id = comes_from.split(":", 2)
+    except ValueError:
         inquiry.services_mentioned = ", ".join(service_names)
         inquiry.status = Status.REVIEWED
         db.session.commit()
-        flash('تمت المراجعة وحفظ البيانات محلياً (المصدر ليس Facebook).', 'success')
-        return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
 
-    parts = comes_from.split(":")
-    sender_id = parts[1]
-    page_id = parts[2]
+        flash("تمت المراجعة وحفظ البيانات محلياً.", "success")
+        return redirect(url_for("inquiry_detail", inquiry_id=inquiry_id))
 
-    page = Page.query.filter_by(page_id=page_id).first()
+    platform_map = {
+        "Facebook": (2, FacebookHandler),
+        "WhatsApp": (1, WahaHandler),
+    }
+
+    if platform not in platform_map:
+        inquiry.services_mentioned = ", ".join(service_names)
+        inquiry.status = Status.REVIEWED
+        db.session.commit()
+
+        flash("تمت المراجعة وحفظ البيانات محلياً.", "success")
+        return redirect(url_for("inquiry_detail", inquiry_id=inquiry_id))
+
+    platform_id, handler_class = platform_map[platform]
+
+    page = Page.query.filter_by(
+        platform_id=platform_id,
+        page_id=page_id
+    ).first()
+
     if not page:
-        flash('الصفحة المرتبطة بهذا الاستفسار غير موجودة.', 'error')
-        return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
+        flash("الصفحة المرتبطة بهذا الاستفسار غير موجودة.", "error")
+        return redirect(url_for("inquiry_detail", inquiry_id=inquiry_id))
 
     try:
-        handler = FacebookHandler(page)
+        handler = handler_class(page)
         handler.send(sender_id, reply_text)
 
         ClientService.update_client_summary_and_last_bot_message(
             sender_id=sender_id,
             page_id=page_id,
-            platform_id=2,
+            platform_id=platform_id,
             summary=f"Doctor reviewed prescription and confirmed tests: {', '.join(service_names)}. Total price: {total_price} EGP.",
             last_bot_message=reply_text
         )
@@ -928,14 +996,13 @@ def confirm_inquiry(inquiry_id):
         inquiry.status = Status.REVIEWED
         db.session.commit()
 
-        flash('تم تأكيد الروشتة وإرسالها للمستخدم بنجاح.', 'success')
+        flash("تم تأكيد الروشتة وإرسالها للمستخدم بنجاح.", "success")
+
     except Exception as e:
         db.session.rollback()
-        flash(f'حدث خطأ أثناء إرسال الرد: {str(e)}', 'error')
+        flash(f"حدث خطأ أثناء إرسال الرد: {str(e)}", "error")
 
-    return redirect(url_for('inquiry_detail', inquiry_id=inquiry_id))
-
-
+    return redirect(url_for("inquiry_detail", inquiry_id=inquiry_id))
 # delete an inquiry
 @app.route('/inquiries/<int:inquiry_id>/delete', methods=['POST'])
 @login_required
@@ -1161,12 +1228,164 @@ def edit_platform(platform_id):
     return render_template('platforms/edit.html', platform=platform)
 
 
+
+
+@app.route("/admin/dashbaord")
+@login_required
+def admin_subscription():
+
+    laboratory = Laboratory.query.first()
+
+    if not laboratory:
+        flash("No laboratory found.", "error")
+        return redirect(url_for("dashboard"))
+
+    subscription = SubscriptionService.get_subscription_by_laboratory_id(
+        laboratory.id
+    )
+
+    if not subscription:
+        flash("Subscription not found.", "error")
+        return redirect(url_for("dashboard"))
+
+    return render_template(
+        "subscription.html",
+        subscription=subscription,
+        status=SubscriptionService.get_status(subscription),
+        alert=SubscriptionService.get_alert(subscription),
+        remaining=SubscriptionService.messages_remaining(subscription),
+        usage=SubscriptionService.usage_percentage(subscription),
+    )
+
+
+@app.route("/admin/subscription/renew", methods=["POST"])
+@login_required
+def renew_subscription():
+
+    laboratory = Laboratory.query.first()
+
+    subscription = SubscriptionService.get_subscription_by_laboratory_id(
+        laboratory.id
+    )
+
+    months = int(request.form.get("months", 1))
+
+    SubscriptionService.renew(
+        subscription,
+        months=months,
+         )
+    flash("Subscription renewed successfully.", "success")
+    return redirect(url_for("admin_subscription"))
+
+
+@app.route("/admin/subscription/reset", methods=["POST"])
+@login_required
+def reset_subscription_usage():
+
+    laboratory = Laboratory.query.first()
+
+    subscription = SubscriptionService.get_subscription_by_laboratory_id(
+        laboratory.id
+    )
+
+    subscription.message_used = 0
+    subscription.updated_at = datetime.now(timezone.utc)
+
+    db.session.commit()
+
+    flash("Usage reset successfully.", "success")
+
+    return redirect(url_for("admin_subscription"))
+
+
+@app.route("/admin/subscription/suspend", methods=["POST"])
+@login_required
+def suspend_subscription():
+
+    laboratory = Laboratory.query.first()
+
+    subscription = SubscriptionService.get_subscription_by_laboratory_id(
+        laboratory.id
+    )
+
+    SubscriptionService.suspend(subscription)
+
+    flash("Subscription suspended.", "warning")
+
+    return redirect(url_for("admin_subscription"))
+
+
+@app.route("/admin/subscription/activate", methods=["POST"])
+@login_required
+def activate_subscription():
+
+    laboratory = Laboratory.query.first()
+
+    subscription = SubscriptionService.get_subscription_by_laboratory_id(
+        laboratory.id
+    )
+
+    SubscriptionService.activate(subscription)
+
+    flash("Subscription activated.", "success")
+
+    return redirect(url_for("admin_subscription"))  
+
+@app.route("/admin/subscription/update-limit", methods=["POST"])
+@login_required
+def update_subscription_limit():
+
+    laboratory = Laboratory.query.first()
+
+    subscription = SubscriptionService.get_subscription_by_laboratory_id(
+        laboratory.id
+    )
+
+    try:
+        new_limit = int(request.form["new_limit"])
+
+        SubscriptionService.update_limit(
+            subscription,
+            new_limit,
+        )
+
+        flash("Message limit updated successfully.", "success")
+
+    except ValueError:
+        flash("Invalid message limit.", "error")
+
+    return redirect(url_for("admin_subscription"))
+
+@app.route("/admin/subscription/update-grace", methods=["POST"])
+@login_required
+def update_subscription_grace():
+
+    laboratory = Laboratory.query.first()
+
+    subscription = SubscriptionService.get_subscription_by_laboratory_id(
+        laboratory.id
+    )
+
+    try:
+        new_grace = int(request.form["new_grace"])
+
+        SubscriptionService.update_grace_limit(
+            subscription,
+            new_grace,
+        )
+
+        flash("Grace limit updated successfully.", "success")
+
+    except ValueError:
+        flash("Invalid grace limit.", "error")
+
+    return redirect(url_for("admin_subscription"))
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # Facebook webhook
-# ══════════════════════════════════════════════════════════════════════════
-
+# ══════════════════════════════════════
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN") or os.environ.get("FB_VERIFY_TOKEN")
-
 
 @app.route("/webhook/facebook", methods=["GET", "POST"])
 def fb_webhook():
@@ -1196,6 +1415,7 @@ def fb_webhook():
                     handler = FacebookHandler(page)
 
                     for messaging in entry.get("messaging", []):
+
                         message = parse_facebook_message(
                             messaging=messaging,
                             page_id=page.page_id,
@@ -1206,12 +1426,26 @@ def fb_webhook():
                         if not message:
                             continue
 
+                        subscription = SubscriptionService.get_by_page(page)
+
+                        allowed, _ = SubscriptionService.can_use_ai(subscription)
+
+                        if not allowed:
+                            logger.warning(
+                                "Subscription limit reached for laboratory_id=%s",
+                                page.laboratory_id,
+                            )
+                            break
+
                         handler.send_typing(message.sender_id)
+
                         reply, ticket_bytes = handler.handle(message)
 
                         logger.info(
                             "[FB] sender=%s has_reply=%s has_ticket=%s",
-                            message.sender_id, bool(reply), bool(ticket_bytes),
+                            message.sender_id,
+                            bool(reply),
+                            bool(ticket_bytes),
                         )
 
                         if reply:
@@ -1228,30 +1462,39 @@ def fb_webhook():
                         comment_id = parse_facebook_comment(change)
                         if not comment_id:
                             continue
+
                         logger.debug("[FB] comment_id=%s", comment_id)
                         handler.handle_comment(comment_id)
 
             except Exception as e:
                 db.session.rollback()
                 logger.exception("FB webhook processing error")
+
                 from notified_center.EmailSender import send_production_alert
+
                 send_production_alert(
                     subject="Facebook Webhook Worker Failure",
                     body_or_error=e,
-                    context={"entries_count": len(entries) if entries else 0}
+                    context={
+                        "entries_count": len(entries) if entries else 0
+                    }
                 )
+
             finally:
                 db.session.remove()
 
     webhook_executor.submit(process, entries)
-    return "OK", 200
 
+    return "OK", 200
 
 
 @app.route("/webhook/waha", methods=["POST"])
 def waha_webhook():
+    logger.info("Webhook received")
+
     try:
         data = request.json or {}
+        logger.info(data)
     except Exception:
         return "OK", 200
 
@@ -1261,26 +1504,71 @@ def waha_webhook():
     def process(payload, session_name):
         with app.app_context():
             try:
-                page = Page.query.filter_by(waha_session=session_name).first()
-                if not page:
+                whatsapp_platform = Platform.query.filter_by(
+                    name="whatsapp"
+                ).first()
+
+                if not whatsapp_platform:
+                    logger.error("WhatsApp platform not found")
                     return
+
+                page = Page.query.filter_by(
+                    platform_id=whatsapp_platform.id
+                ).first()
+
+                if not page:
+                    logger.error("WhatsApp page not found")
+                    return
+
+                logger.info(
+                    "Using WhatsApp page: %s",
+                    page.page_id
+                )
 
                 handler = WahaHandler(page)
 
-                message = handler.parse_message(payload, page.page_id)
+                # Subscription
+                subscription = SubscriptionService.get_by_page(page)
+
+                message = handler.parse_message(
+                    payload,
+                    page.page_id
+                )
+
                 if not message:
+                    logger.info("Message ignored")
+                    return
+
+                allowed, _ = SubscriptionService.can_use_ai(subscription)
+
+                if not allowed:
+                    logger.warning(
+                        "Subscription limit reached for laboratory_id=%s",
+                        page.laboratory_id,
+                    )
                     return
 
                 handler.send_typing(message.sender_id)
+
+                # NOTE: handler.handle() -> run_agent() already deducts
+                # this message + its real cost from the subscription
+                # internally (see message_processor._consume_subscription).
+                # Do not call SubscriptionService.consume() again here —
+                # that would double-count usage for every reply sent.
                 reply, ticket_bytes = handler.handle(message)
 
                 logger.info(
                     "[WAHA] sender=%s has_reply=%s has_ticket=%s",
-                    message.sender_id, bool(reply), bool(ticket_bytes),
+                    message.sender_id,
+                    bool(reply),
+                    bool(ticket_bytes),
                 )
 
                 if reply:
-                    handler.send(message.sender_id, reply)
+                    handler.send(
+                        message.sender_id,
+                        reply,
+                    )
 
                 if ticket_bytes:
                     handler.send_image(
@@ -1292,16 +1580,30 @@ def waha_webhook():
             except Exception as e:
                 db.session.rollback()
                 logger.exception("WAHA webhook processing error")
-                from notified_center.EmailSender import send_production_alert
-                send_production_alert(
-                    subject="WAHA Webhook Worker Failure",
-                    body_or_error=e,
-                    context={"session_name": session_name}
-                )
+
+                try:
+                    from notified_center.EmailSender import send_production_alert
+
+                    send_production_alert(
+                        subject="WAHA Webhook Worker Failure",
+                        body_or_error=e,
+                        context={
+                            "session_name": session_name
+                        }
+                    )
+
+                except Exception:
+                    logger.exception("Failed to send production alert")
+
             finally:
                 db.session.remove()
 
-    webhook_executor.submit(process, payload, session_name)
+    webhook_executor.submit(
+        process,
+        payload,
+        session_name,
+    )
+
     return "OK", 200
 # ══════════════════════════════════════════════════════════════════════════
 # Run

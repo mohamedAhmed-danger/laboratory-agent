@@ -42,6 +42,10 @@ working hours, location,
 phone numbers,
 or anything unrelated to laboratory retrieval.
 
+results
+- Description: The user asks how to get/download lab results, asks if results are ready, or inquires about anything directly connected to retrieving lab results.
+- Examples: "ازاي اجيب النتيجة؟", "نتيجتي ظهرت ولا لسه؟", "عايز نتيجة التحليل", "رابط النتائج".
+
 ====================================================
 TASK 2 : Refined Search Queries
 ====================================================

@@ -19,7 +19,7 @@ def fuzzy_search(
     query: str,
     aliases: list[str] | None = None,
     entity_types: list[EntityType] | None = None,
-    limit: int = 5,
+    limit: int = 2,
 ) -> list[SearchResult]:
 
     normalized_query = normalize(query)

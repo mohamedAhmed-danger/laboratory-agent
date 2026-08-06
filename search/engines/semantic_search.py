@@ -46,7 +46,7 @@ def semantic_search(
     query: str,
     description: str | None = None,
     entity_types: list[EntityType] | None = None,
-    limit: int = 5,
+    limit: int = 3,
 ) -> list[SearchResult]:
 
     if not query.strip():

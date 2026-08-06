@@ -1154,3 +1154,833 @@ button, input, select, textarea {
     width: 100%;
   }
 }
+/* ============================================================
+   DASHBOARD REDESIGN — ADDITIONS ONLY
+   Subscription Section + Alerts + Stat/Quick Card Polish
+   Append this file at the end of static/css/style.css
+   ============================================================ */
+
+/* ── Section spacing rhythm ─────────────────────────────────── */
+.section-title {
+  margin-top: 8px;
+  margin-bottom: 18px;
+}
+
+.section-title h3 {
+  gap: 10px;
+}
+
+.section-title h3 svg,
+.section-title h3 i {
+  width: 20px;
+  height: 20px;
+  color: var(--primary);
+}
+
+/* ============================================================
+   SUBSCRIPTION CARD
+   ============================================================ */
+.glass-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--shadow-md);
+}
+
+.subscription-card {
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: stretch;
+  gap: 32px;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.subscription-card::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  left: -60px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.subscription-side {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.subscription-side-status {
+  justify-content: center;
+}
+
+.subscription-divider {
+  width: 1px;
+  background: var(--surface-border);
+  align-self: stretch;
+}
+
+/* Status Badge */
+.sub-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 18px;
+  border-radius: var(--radius-full);
+  font-size: 0.95rem;
+  font-weight: 700;
+  width: fit-content;
+  box-shadow: var(--shadow-sm);
+}
+
+.sub-status-badge svg,
+.sub-status-badge i {
+  width: 18px;
+  height: 18px;
+}
+
+.sub-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sub-status-active {
+  background: var(--status-attended-bg);
+  color: var(--status-attended-text);
+  border: 1px solid var(--status-attended-border);
+}
+.sub-status-active .sub-status-dot {
+  background: var(--status-attended-dot);
+  box-shadow: 0 0 8px var(--status-attended-dot);
+  animation: pulse-glow 2s infinite;
+}
+
+.sub-status-grace {
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+  border: 1px solid var(--status-pending-border);
+}
+.sub-status-grace .sub-status-dot {
+  background: var(--status-pending-dot);
+  box-shadow: 0 0 8px var(--status-pending-dot);
+  animation: pulse-glow 2s infinite;
+}
+
+.sub-status-suspended {
+  background: var(--status-noshow-bg);
+  color: var(--status-noshow-text);
+  border: 1px solid var(--status-noshow-border);
+}
+.sub-status-suspended .sub-status-dot {
+  background: var(--status-noshow-dot);
+  box-shadow: 0 0 8px var(--status-noshow-dot);
+}
+
+/* Plan Name */
+.sub-plan-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.sub-plan-name svg,
+.sub-plan-name i {
+  width: 19px;
+  height: 19px;
+  color: #f59e0b;
+}
+
+/* Period */
+.sub-period {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px dashed var(--surface-border);
+}
+
+.sub-period-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.sub-period-label svg,
+.sub-period-label i {
+  width: 14px;
+  height: 14px;
+}
+
+.sub-period-dates {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.sub-period-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sub-period-tag {
+  background: var(--surface-hover);
+  border: 1px solid var(--surface-border);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+/* Usage Side */
+.subscription-side-usage {
+  justify-content: center;
+}
+
+.sub-usage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.sub-usage-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.sub-usage-title svg,
+.sub-usage-title i {
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+}
+
+.sub-usage-numbers {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  direction: ltr;
+}
+
+/* Progress Bar */
+.progress-track {
+  width: 100%;
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin: 10px 0;
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  background-size: 200% 100%;
+  animation: progress-shimmer 2.4s linear infinite;
+}
+
+@keyframes progress-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: 0 0; }
+}
+
+.progress-green {
+  background-image: linear-gradient(90deg, #10b981, #34d399, #10b981);
+}
+
+.progress-orange {
+  background-image: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
+}
+
+.progress-red {
+  background-image: linear-gradient(90deg, #ef4444, #f87171, #ef4444);
+}
+
+.progress-danger {
+  background-image: linear-gradient(90deg, #7f1d1d, #b91c1c, #7f1d1d);
+}
+
+.sub-usage-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.sub-usage-percent {
+  font-weight: 800;
+  color: var(--text-primary);
+  direction: ltr;
+}
+
+.sub-usage-remaining {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.sub-usage-remaining svg,
+.sub-usage-remaining i {
+  width: 14px;
+  height: 14px;
+}
+
+/* ============================================================
+   ALERTS SECTION
+   ============================================================ */
+.alerts-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 32px;
+}
+
+.alert-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 22px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.alert-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.alert-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.alert-icon svg,
+.alert-icon i {
+  width: 22px;
+  height: 22px;
+}
+
+.alert-text h4 {
+  font-size: 0.95rem;
+  font-weight: 800;
+  margin-bottom: 3px;
+}
+
+.alert-text p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.alert-green {
+  background: var(--status-attended-bg);
+  border-color: var(--status-attended-border);
+}
+.alert-green .alert-icon { background: rgba(16, 185, 129, 0.15); color: #047857; }
+.alert-green .alert-text h4 { color: #047857; }
+.alert-green .alert-text p { color: #065f46; }
+
+.alert-orange {
+  background: var(--status-pending-bg);
+  border-color: var(--status-pending-border);
+}
+.alert-orange .alert-icon { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+.alert-orange .alert-text h4 { color: #b45309; }
+.alert-orange .alert-text p { color: #92400e; }
+
+.alert-red {
+  background: var(--status-noshow-bg);
+  border-color: var(--status-noshow-border);
+}
+.alert-red .alert-icon { background: rgba(244, 63, 94, 0.15); color: #be123c; }
+.alert-red .alert-text h4 { color: #be123c; }
+.alert-red .alert-text p { color: #9f1239; }
+
+/* ============================================================
+   STAT CARD POLISH
+   ============================================================ */
+.stats-grid {
+  gap: 24px;
+  margin-bottom: 36px;
+}
+
+.stat-card {
+  padding: 26px 24px;
+  gap: 20px;
+}
+
+.stat-card-hover {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.stat-card-hover:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: var(--shadow-lg);
+}
+
+.stat-icon {
+  width: 54px;
+  height: 54px;
+  transition: transform 0.3s ease;
+}
+
+.stat-icon svg {
+  width: 27px;
+  height: 27px;
+}
+
+.stat-card-hover:hover .stat-icon {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.stat-value {
+  font-size: 1.7rem;
+}
+
+/* ============================================================
+   QUICK CARD POLISH
+   ============================================================ */
+.quick-grid {
+  gap: 24px;
+}
+
+.quick-card {
+  padding: 22px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.quick-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.quick-icon {
+  transition: transform 0.3s ease;
+}
+
+.quick-card:hover .quick-icon {
+  transform: scale(1.1) rotate(-3deg);
+}
+
+/* ============================================================
+   RESPONSIVE — SUBSCRIPTION & ALERTS
+   ============================================================ */
+@media (max-width: 900px) {
+  .subscription-card {
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+  }
+  .subscription-divider {
+    width: 100%;
+    height: 1px;
+  }
+}
+
+@media (max-width: 600px) {
+  .subscription-card {
+    padding: 20px;
+  }
+  .sub-status-badge {
+    font-size: 0.85rem;
+    padding: 8px 14px;
+  }
+  .sub-period-dates {
+    gap: 10px;
+  }
+  .alert-card {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .alert-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .alert-icon svg,
+  .alert-icon i {
+    width: 18px;
+    height: 18px;
+  }
+}
+/* ============================================================
+   ADMIN SUBSCRIPTION PAGE — ADDITIONS ONLY
+   Append to the end of static/css/style.css
+   (after the dashboard subscription-card additions)
+   ============================================================ */
+
+/* ── Card title icon alignment (safe, additive) ─────────────── */
+.card-header .card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title svg,
+.card-title i {
+  width: 18px;
+  height: 18px;
+  color: var(--primary);
+}
+
+/* ============================================================
+   SECTION 1 — SUMMARY CARD
+   ============================================================ */
+.summary-card {
+  padding: 28px 32px;
+  margin-bottom: 32px;
+}
+
+.summary-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 22px;
+  margin-bottom: 22px;
+  border-bottom: 1px dashed var(--surface-border);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface-hover);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+
+.info-item:hover {
+  border-color: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.info-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.info-icon svg,
+.info-icon i {
+  width: 20px;
+  height: 20px;
+}
+
+.info-body {
+  min-width: 0;
+}
+
+.info-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.info-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   SECTION 2 — USAGE CARD
+   ============================================================ */
+.usage-card {
+  padding: 28px 32px;
+  margin-bottom: 32px;
+}
+
+.usage-header-lg {
+  margin-bottom: 6px;
+}
+
+.usage-numbers-lg {
+  font-size: 1.3rem;
+}
+
+.progress-track-lg {
+  height: 14px;
+  margin: 14px 0 24px;
+}
+
+.usage-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.usage-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 18px 14px;
+  background: var(--surface-hover);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+
+.usage-stat:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-sm);
+  border-color: #cbd5e1;
+}
+
+.usage-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.usage-stat-icon svg,
+.usage-stat-icon i {
+  width: 19px;
+  height: 19px;
+}
+
+.usage-stat-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  direction: ltr;
+}
+
+.usage-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* ============================================================
+   SECTIONS 3–5 — SETTINGS GRID (Renew / Limits)
+   ============================================================ */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.action-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  transition: var(--transition);
+}
+
+.action-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.action-card .card-header {
+  padding: 0 0 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.action-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+
+.action-form {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-success {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.btn-success:hover {
+  background: #059669;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   SECTION 6 — DANGER ZONE
+   ============================================================ */
+.danger-zone {
+  padding: 26px 30px;
+  border: 1px solid var(--status-noshow-border);
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.6) 0%, rgba(255, 255, 255, 0.9) 100%);
+  margin-bottom: 32px;
+}
+
+.danger-zone-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px dashed var(--status-noshow-border);
+}
+
+.danger-zone-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  background: rgba(244, 63, 94, 0.12);
+  color: #be123c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.danger-zone-icon svg,
+.danger-zone-icon i {
+  width: 22px;
+  height: 22px;
+}
+
+.danger-zone-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #9f1239;
+  margin-bottom: 4px;
+}
+
+.danger-zone-sub {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 560px;
+}
+
+.danger-zone-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.danger-zone-actions form {
+  display: inline-flex;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 900px) {
+  .summary-card,
+  .usage-card {
+    padding: 22px;
+  }
+  .summary-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  .info-grid,
+  .usage-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .danger-zone-header {
+    flex-direction: column;
+  }
+  .danger-zone-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .danger-zone-actions form {
+    width: 100%;
+  }
+  .danger-zone-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .info-grid,
+  .usage-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

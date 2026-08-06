@@ -28,6 +28,11 @@ class Laboratory(db.Model):
     # ظبطنا الـ relationships عشان تقرأ من الكلاسات الصح
     services = db.relationship('LabService', backref='laboratory')
     bundles = db.relationship("Bundle", backref="laboratory", lazy=True)
+    subscription = db.relationship(
+    "Subscription",
+    back_populates="laboratory",
+    uselist=False,
+)
 
     inquiries = db.relationship('Inquiry', backref='laboratory')
 
@@ -205,3 +210,29 @@ class RequestCounter(db.Model):
             RequestCounter.count > 0
         ).update({RequestCounter.count: RequestCounter.count - 1})
         db.session.commit()
+class Subscription(db.Model):
+    __tablename__ = "subscriptions"
+    id = db.Column(db.Integer, primary_key=True)
+    laboratory_id = db.Column(db.Integer, db.ForeignKey('laboratory.id'), nullable=False, unique=True)
+    plan_name = db.Column(db.String(100),default="Standard", nullable=False)
+    message_limit = db.Column(db.Integer,default=5000,nullable=False)
+    message_used = db.Column(db.Integer,default=0,nullable=False)
+    grace_limit = db.Column(db.Integer,default=50,nullable=False)
+    estimated_cost = db.Column(db.Float,default=0.0,nullable=False)
+    start_date = db.Column(db.DateTime)
+    end_date = db.Column(db.DateTime)
+    renew_count = db.Column(db.Integer,default=0,nullable=False)
+    last_renewed_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    laboratory = db.relationship(
+       "Laboratory",
+       back_populates="subscription",
+      )    
+     
+
+    is_active = db.Column(
+    db.Boolean,
+    default=True,
+    nullable=False,
+       )

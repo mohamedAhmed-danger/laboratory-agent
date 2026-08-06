@@ -37,7 +37,6 @@ def run_search(refined_queries):
         reverse=True,
     )
 
-    results = results[:10]
 
     return {
         "results": results,

@@ -136,7 +136,10 @@ answer immediately before asking for any missing booking field.
 
 Never say "I'll check" if the information is already available.
 
-FORMATTING
+====================
+LAB INFORMATION FORMATTING
+====================
+don't give the user any test or lab without this FORMATIING 
 
 Keep replies short and suitable for chat.
 
@@ -157,6 +160,9 @@ Never repeat the same information.
 
 Do not repeat greetings in every response.
 
+if the user provide more than one lab give him the total price of tests or labs  
+
+
 After a successful booking:
 
 Reply only with the booking confirmation.
@@ -167,25 +173,22 @@ Do not repeat previous information.
 
 
 def booking_node(state: AgentState) -> dict:
-    page_id          = state.get("page_id")
-    sender_id        = state.get("sender_id")
-    platform_id      = state.get("platform_id")
-    user_message     = state["user_message"]
-    current_summary  = state.get("summary") or ""
+    page_id = state.get("page_id")
+    sender_id = state.get("sender_id")
+    platform_id = state.get("platform_id")
+    user_message = state["user_message"]
+    current_summary = state.get("summary") or ""
     last_bot_message = state.get("last_bot_message") or ""
     matched_context = state.get("rag_context", "")
-   
 
     now = datetime.now()
     current_time_info = now.strftime("Today is %A, %B %d, %Y. Current time is %I:%M %p")
 
-    lab_info= LabDataService.get_lab_info(page_id)
+    lab_info = LabDataService.get_lab_info(page_id)
 
-   
     matched_context = state.get("rag_context") or ""
-    
 
-    llm            = get_gemini()
+    llm = get_gemini()
     structured_llm = llm.with_structured_output(BookingResponse, include_raw=True)
 
     system_prompt = f"""
@@ -216,9 +219,9 @@ Last bot message: {last_bot_message}
 
     # ── LLM call ─────────────────────────────────────────────────────────────
     try:
-        result        = structured_llm.invoke(messages)
+        result = structured_llm.invoke(messages)
         parsed: BookingResponse = result["parsed"]
-        raw_response  = result["raw"]
+        raw_response = result["raw"]
     except Exception as e:
         print(f"[Booking Node] LLM error: {e}")
         fallback = detect_language_fallback(
@@ -227,22 +230,22 @@ Last bot message: {last_bot_message}
             default="Sorry, a temporary error occurred. Please try again.",
         )
         return {
-            "response":          fallback,
-            "summary":           current_summary,
-            "last_bot_message":  fallback,
-            "booking_saved":     False,
+            "response": fallback,
+            "summary": current_summary,
+            "last_bot_message": fallback,
+            "booking_saved": False,
             "booking_reference": None,
-            "booking_ticket":    None,
-            "booking_usage":     None,
+            "booking_ticket": None,
+            "booking_usage": None,
         }
 
     # ── usage ─────────────────────────────────────────────────────────────────
     usage = getattr(raw_response, "usage_metadata", None)
     booking_usage = (
         {
-            "input_tokens":  usage.get("input_tokens",  0),
+            "input_tokens": usage.get("input_tokens", 0),
             "output_tokens": usage.get("output_tokens", 0),
-            "total_tokens":  usage.get("total_tokens",  0),
+            "total_tokens": usage.get("total_tokens", 0),
         }
         if usage
         else None
@@ -250,17 +253,15 @@ Last bot message: {last_bot_message}
 
     booking_data = parsed.booking.model_dump(exclude_none=True)
 
-  
-
-    required_fields    = ["name", "phone", "details", "date"]
+    required_fields = ["name", "phone", "details", "date"]
     all_fields_present = all(
-    booking_data.get(f)
-    for f in required_fields
-)
+        booking_data.get(f)
+        for f in required_fields
+    )
 
-    booking_saved     = False
+    booking_saved = False
     booking_reference = None
-    booking_ticket    = None
+    booking_ticket = None
 
     # ── save ──────────────────────────────────────────────────────────────────
     if parsed.ready_to_save and parsed.confirmed and all_fields_present:
@@ -271,7 +272,7 @@ Last bot message: {last_bot_message}
             })
 
             if result.success and result.booking:
-                booking_saved     = True
+                booking_saved = True
                 booking_reference = result.booking.reference_id
 
                 total_price = None
@@ -296,7 +297,7 @@ Last bot message: {last_bot_message}
                 except Exception as p_err:
                     print(f"[Booking Node] total_price calculation error: {p_err}")
 
-                booking_ticket    = generate_booking_ticket(
+                booking_ticket = generate_booking_ticket(
                     name=booking_data.get("name"),
                     phone=booking_data.get("phone"),
                     date=booking_data.get("date"),
@@ -308,14 +309,16 @@ Last bot message: {last_bot_message}
                 clean_reply = detect_language_fallback(
                     user_message,
                     arabic=(
+                        f"شكراً لثقتكم في معمل اختيار! 🌟\n"
                         f"تم تأكيد الحجز بنجاح ✅\n"
                         f"رقم الحجز: *{booking_reference}*\n"
-                        f"سيتواصل معك فريقنا قريبًا."
+                        f"سيتواصل معك فريق اختيار قريبًا."
                     ),
                     default=(
+                        f"Thank you for choosing Ikhtiar Lab! 🌟\n"
                         f"Your booking has been confirmed ✅\n"
                         f"Reference: *{booking_reference}*\n"
-                        f"Our team will contact you soon."
+                        f"The Ikhtiar team will contact you soon."
                     ),
                 )
             else:
@@ -323,7 +326,7 @@ Last bot message: {last_bot_message}
 
         except Exception as e:
             print(f"[Booking Node] Tool error: {e}")
-            booking_saved  = False
+            booking_saved = False
             booking_ticket = None
             parsed.summary = current_summary   # rollback summary
 
@@ -353,11 +356,11 @@ Last bot message: {last_bot_message}
     )
 
     return {
-        "response":          clean_reply,
-        "summary":           parsed.summary,
-        "last_bot_message":  clean_reply,
-        "booking_saved":     booking_saved,
+        "response": clean_reply,
+        "summary": parsed.summary,
+        "last_bot_message": clean_reply,
+        "booking_saved": booking_saved,
         "booking_reference": booking_reference,
-        "booking_ticket":    booking_ticket,
-        "booking_usage":     booking_usage,
+        "booking_ticket": booking_ticket,
+        "booking_usage": booking_usage,
     }

@@ -29,7 +29,7 @@ def run_pre_approval_stage(
     generated = generate_knowledge(request)
 
     # Step 2 - Normalize
-    generated = normalize_knowledge(generated)
+    generated = normalize_knowledge(generated, request.name)
 
     # Step 3 - Review Page
     return generated
@@ -41,7 +41,6 @@ def regenerate(
     previous_output: GeneratedKnowledge,
     admin_feedback: str | None = None,
 ) -> GeneratedKnowledge:
- 
 
     generated = regenerate_knowledge(
         request=request,
@@ -49,7 +48,10 @@ def regenerate(
         admin_feedback=admin_feedback,
     )
 
-    generated = normalize_knowledge(generated)
+    generated = normalize_knowledge(
+        generated,
+        request.name
+    )
 
     return generated
 

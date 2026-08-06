@@ -3,7 +3,8 @@
 from .schemas import GeneratedKnowledge
 
 
-def normalize_knowledge(data: GeneratedKnowledge) -> GeneratedKnowledge:
+def normalize_knowledge(data: GeneratedKnowledge,
+                        item_name: str,) -> GeneratedKnowledge:
 
 
     data.aliases = sorted(
@@ -24,6 +25,6 @@ def normalize_knowledge(data: GeneratedKnowledge) -> GeneratedKnowledge:
 
     data.description = data.description.strip()
 
-    data.construct_search_text(data.item_name)
+    data.construct_search_text(item_name)
 
     return data

@@ -27,6 +27,7 @@ def build_graph():
     graph.add_node("complaint", complaint_node)
     graph.add_node("inquiry", inquiry_node)
     graph.add_node("direct", direct_node)
+    graph.add_node("results",lab_results)
 
     graph.set_entry_point("intent")
 
@@ -39,6 +40,7 @@ def build_graph():
             "inquiry": "rag",
             "complaint": "complaint",
             "direct": "direct",
+            "results":"results"
         },
     )
 
@@ -56,6 +58,7 @@ def build_graph():
     graph.add_edge("complaint", END)
     graph.add_edge("inquiry", END)
     graph.add_edge("direct", END)
+    graph.add_edge("results",END)
 
     return graph.compile()
 
